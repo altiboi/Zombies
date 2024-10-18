@@ -37,7 +37,7 @@ const createZombie = (skin, position) => {
         scene.add(fbx);
 
         const mixer = new THREE.AnimationMixer(fbx);
-        const zombieData = { fbx, mixer, actionChosen: false, chosenAction: null };
+        const zombieData = { fbx, mixer, actionChosen: false, chosenAction: null, isDead: false, life: 10 }; // Set life to 5
 
         // Load animations
         loader.load('/Running.fbx', (fb) => {
@@ -53,7 +53,17 @@ const createZombie = (skin, position) => {
         loader.load('/zombie_biting_neck.fbx', (fb) => {
             zombieData.biteNeckAction = mixer.clipAction(fb.animations[0]);
         });
-
+        loader.load('/Zombie_Dying.fbx', (fb) => {
+            zombieData.Dying1 = mixer.clipAction(fb.animations[0]);
+            zombieData.Dying1.loop = THREE.LoopOnce; // Set loop mode to LoopOnce
+            zombieData.Dying1.clampWhenFinished = true; // Ensure the animation doesn't reset
+            console.log('Dying animation loaded:', zombieData.Dying1);
+        });
+        loader.load('/Zombie_Death.fbx', (fb) => {
+            zombieData.Dying2 = mixer.clipAction(fb.animations[0]);
+            zombieData.Dying2.loop = THREE.LoopOnce; // Set loop mode to LoopOnce
+            zombieData.Dying2.clampWhenFinished = true; // Ensure the animation doesn't reset
+        });
         zombies.push(zombieData);
 
         fbx.traverse((child) => {
@@ -69,12 +79,8 @@ createZombie('/Warzombie.fbx', new THREE.Vector3(5, 0, 5));
 createZombie('/YakuZombie.fbx', new THREE.Vector3(-5, 0, 5));
 createZombie('/Zombiegirl.fbx', new THREE.Vector3(5, 0, -5));
 
-function getRandomAction(zombie) {
-    const actions = [
-        zombie.punchAction,
-        zombie.biteAction,
-        zombie.biteNeckAction
-    ].filter(action => action); // Filter out undefined actions
+function getRandomAction(zombie, actions) {
+    actions = actions.filter(action => action); // Filter out undefined actions
     const randomIndex = Math.floor(Math.random() * actions.length);
     return actions[randomIndex];
 }
@@ -98,6 +104,26 @@ function switchAction(zombie, toAction) {
         zombie.activeAction = toAction; // Update the active action
     }
 }
+// Global variable to track if Shift is pressed
+let isShiftPressed = false;
+
+window.addEventListener('keydown', (event) => {
+    keyboard[event.key] = true;
+
+    // Check if Shift key is pressed
+    if (event.key === 'Shift') {
+        isShiftPressed = true;
+    }
+});
+
+window.addEventListener('keyup', (event) => {
+    keyboard[event.key] = false;
+
+    // Reset Shift key state
+    if (event.key === 'Shift') {
+        isShiftPressed = false;
+    }
+});
 
 function animate() {
     requestAnimationFrame(animate);
@@ -117,24 +143,54 @@ function animate() {
 
         const distanceToCamera = zombiePosition.distanceTo(cameraPosition);
 
-        if (distanceToCamera > minimumDistance) {
-            // Reset the action choice if the zombie is far away
-            zombie.actionChosen = false; // Reset the action choice
-            fbx.position.add(direction.multiplyScalar(zombieSpeed)); // Move the zombie towards the camera
 
-            // Play the running animation
+        if (!zombie.isDead && isShiftPressed) {
+            zombie.life--;
+            console.log(`Zombie life: ${zombie.life}`);
+
+            if (zombie.life <= 0) {
+                console.log('Zombie is dying');
+                zombie.isDead = true;
+
+                const actions = [zombie.Dying1, zombie.Dying2]; 
+                zombie.chosenAction = getRandomAction(zombie, actions);
+                switchAction(zombie, zombie.chosenAction);
+                return; 
+            }
+        }
+
+        if (zombie.isDead) {
+
+            if (zombie.chosenAction && !zombie.chosenAction.isRunning()) {
+                scene.remove(zombie.fbx);
+                zombies.splice(zombies.indexOf(zombie), 1); 
+            }
+            return; 
+        }
+
+     
+        if (distanceToCamera > minimumDistance) {
+            zombie.actionChosen = false; 
+            fbx.position.add(direction.multiplyScalar(zombieSpeed)); 
+
+     
             if (zombie.runAction) {
                 switchAction(zombie, zombie.runAction);
             }
         } else {
-            // Choose and stick to a random action if not chosen yet
+
+            const actions = [
+                zombie.punchAction,
+                zombie.biteAction,
+                zombie.biteNeckAction
+            ];
             if (!zombie.actionChosen) {
-                zombie.chosenAction = getRandomAction(zombie); // Randomly choose an action
-                zombie.actionChosen = true; // Mark the action as chosen
+                zombie.chosenAction = getRandomAction(zombie, actions);
+                zombie.actionChosen = true;
             }
-            // Execute the chosen action
+
             if (zombie.chosenAction) {
-                switchAction(zombie, zombie.chosenAction); // Stick to the chosen action
+                switchAction(zombie, zombie.chosenAction);
             }
         }
     });
