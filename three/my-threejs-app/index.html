@@ -2,10 +2,75 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Loading Models</title>
+    <title>Vite App</title>
     <style>
-      #loading-screen {
+        body { margin: 0; }
+        canvas { display: block; }
+        #instructions {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            padding: 10px;
+            font-family: Arial, sans-serif;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px; /* Adjust the center dot size */
+            height: 4px;
+            background: whitesmoke;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        .crosshair-line {
+            position: absolute;
+            background: whitesmoke;
+            pointer-events: none;
+        }
+
+        #crosshair-line-top,
+        #crosshair-line-bottom {
+            width: 2px;
+            height: 15px; /* Adjust the length of the vertical lines */
+        }
+
+        #crosshair-line-left,
+        #crosshair-line-right {
+            width: 15px; /* Adjust the length of the horizontal lines */
+            height: 2px;
+        }
+
+        #crosshair-line-top {
+            top: calc(50% - 25px); /* Adjust the gap above the center */
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        #crosshair-line-bottom {
+            top: calc(50% + 10px); /* Adjust the gap below the center */
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        #crosshair-line-left {
+            top: 50%;
+            left: calc(50% - 25px); /* Adjust the gap to the left of the center */
+            transform: translateY(-50%);
+        }
+
+        #crosshair-line-right {
+            top: 50%;
+            left: calc(50% + 10px); /* Adjust the gap to the right of the center */
+            transform: translateY(-50%);
+        }
+        #loading-screen {
         position: fixed;
         top: 0;
         left: 0;
@@ -31,12 +96,24 @@
     </style>
   </head>
   <body>
-    <div id="loading-screen">
-      <div>Loading... Please wait</div>
-      <div id="progress-container">
-        <div id="progress-bar"></div>
-      </div>
+    <div id="instructions">
+        Click to start<br>
+        WASD to move<br>
+        Mouse to look around<br>
+        ESC to release mouse
     </div>
+        <div id="crosshair">
+        <div id="crosshair-line-top" class="crosshair-line"></div>
+        <div id="crosshair-line-bottom" class="crosshair-line"></div>
+        <div id="crosshair-line-left" class="crosshair-line"></div>
+        <div id="crosshair-line-right" class="crosshair-line"></div>
+    </div>
+    <div id="loading-screen">
+        <div>Loading... Please wait</div>
+        <div id="progress-container">
+          <div id="progress-bar"></div>
+        </div>
+      </div>
     <script type="module" src="/main.js"></script>
   </body>
 </html>
