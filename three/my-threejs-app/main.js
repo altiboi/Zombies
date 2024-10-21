@@ -3,7 +3,6 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import {PointerLockControls} from 'three/examples/jsm/controls/PointerLockControls.js'
 
 
-
 // Loading Manager to track progress
 const loadingManager = new THREE.LoadingManager(
     () => {
@@ -19,7 +18,11 @@ const loadingManager = new THREE.LoadingManager(
 
 let sun, moon, sunMesh, moonMesh,  sky, clouds, stars, terrainGeometry;
 let daySkyMaterial, nightSkyMaterial;
-
+let playerLife = 5; // Player starts with 5 life points
+let kills = 0;
+let currentLevel = 1;
+let isGameOver = false;
+let gameOverScreen;
 
 
 // Set up the scene, camera, and renderer
@@ -40,6 +43,7 @@ const zombies = [];
 const obstacles = [];
 const loader = new FBXLoader(loadingManager); 
 const controls = new PointerLockControls(camera, document.body);
+
 
 
 //MINIMAP SECTION
@@ -109,6 +113,149 @@ function updateMinimap() {
   minimapContext.fillStyle = 'red';
   minimapContext.fill();
   minimapContext.restore();
+}
+
+//Life BAR
+const lifeBarContainer = document.createElement('div');
+lifeBarContainer.style.position = 'absolute';
+lifeBarContainer.style.top = '20px';
+lifeBarContainer.style.right = '20px';
+lifeBarContainer.style.width = '110px'; // Container size slightly bigger than life bar
+lifeBarContainer.style.height = '25px';
+lifeBarContainer.style.backgroundColor = 'black'; // Retro black background
+lifeBarContainer.style.border = '3px solid #888'; // Gray border for retro style
+lifeBarContainer.style.boxShadow = '0 0 10px #000'; // Retro glowing effect
+
+const lifeBar = document.createElement('div');
+lifeBar.style.width = '100%'; // Full life bar starts at 100%
+lifeBar.style.height = '100%';
+lifeBar.style.backgroundColor = 'green'; // Healthy color
+lifeBar.style.imageRendering = 'pixelated'; // Adds a pixelated effect for retro games
+lifeBar.style.transition = 'width 0.3s'; // Smooth transition when life changes
+
+lifeBarContainer.appendChild(lifeBar);
+document.body.appendChild(lifeBarContainer);
+
+//kill meter & level displayer
+const killCount = document.createElement('div');
+killCount.style.position = 'absolute';
+killCount.style.top = '50px'; // Positioned below the life bar
+killCount.style.right = '20px';
+killCount.style.width = '110px';
+killCount.style.height = '60px';
+killCount.style.color = 'yellow'; // Flashy retro color
+killCount.style.fontFamily = "'Press Start 2P', sans-serif"; // Blocky pixel font
+killCount.style.fontSize = '18px';
+killCount.style.textAlign = 'center';
+killCount.style.backgroundColor = 'black';
+killCount.style.border = '3px solid #888';
+killCount.style.boxShadow = '0 0 10px #000';
+killCount.style.padding = '5px';
+killCount.style.imageRendering = 'pixelated'; // Retro pixelated effect
+killCount.textContent = `Kills: 0<br>Level: 1`; // Initial kill count
+
+document.body.appendChild(killCount);
+
+function updateKillCount() {
+    kills++;
+    killAndLevelDisplay.innerHTML = `Kills: ${kills}<br style="display:none;>Level: ${currentLevel}`;
+
+}
+
+function updateLevel(){
+    currentLevel++
+    killAndLevelDisplay.innerHTML = `Kills: ${kills}<br style="display:none;>Level: ${currentLevel}`;
+
+}
+
+// Update life bar based on player's current life
+function updateLifeBar() {
+    const lifePercentage = (playerLife / 5) * 100; // Convert to percentage
+    lifeBar.style.width = `${lifePercentage}%`; // Adjust based on life percentage
+
+    if (lifePercentage <= 50) {
+        lifeBar.style.backgroundColor = 'yellow'; // Change color when life is low
+    }
+    if (lifePercentage <= 20) {
+        lifeBar.style.backgroundColor = 'red'; // Critical life level
+    }
+}
+
+//game over screen
+
+function createGameOverScreen() {
+    gameOverScreen = document.createElement('div');
+    gameOverScreen.style.position = 'absolute';
+    gameOverScreen.style.top = '50%';
+    gameOverScreen.style.left = '50%';
+    gameOverScreen.style.transform = 'translate(-50%, -50%)';
+    gameOverScreen.style.textAlign = 'center';
+    gameOverScreen.style.color = 'orange';
+    gameOverScreen.style.fontFamily = "'Press Start 2P', cursive";
+    gameOverScreen.style.fontSize = '24px';
+    gameOverScreen.style.display = 'none';
+    gameOverScreen.innerHTML = `
+        <h1 style="color: orange;">GAME OVER</h1>
+        <p>PLAY AGAIN?</p>
+        <button id="yes-btn" style="margin: 10px; padding: 5px 10px; font-family: inherit; font-size: 18px;">YES</button>
+        <button id="no-btn" style="margin: 10px; padding: 5px 10px; font-family: inherit; font-size: 18px;">NO</button>
+    `;
+    document.body.appendChild(gameOverScreen);
+
+    document.getElementById('yes-btn').addEventListener('click', restartGame);
+    document.getElementById('no-btn').addEventListener('click', () => {
+        // Do nothing when 'NO' is clicked, game remains in "Game Over" state
+    });
+}
+
+// Call this function to initialize the game over screen
+createGameOverScreen();
+
+
+function checkGameOver() {
+    if (playerLife <= 0 && !isGameOver) {
+        isGameOver = true;
+        playerLife = 0;
+        updateLifeBar();
+        showGameOverScreen();
+    }
+}
+
+function showGameOverScreen() {
+    controls.unlock();
+    gameOverScreen.style.display = 'block';
+}
+
+
+function restartGame() {
+    isGameOver = false;
+    playerLife = 5; // Reset player life
+    kills = 0; // Reset kill count
+    updateLifeBar();
+    updateKillCount();
+    gameOverScreen.style.display = 'none';
+    
+    // Reposition existing zombies instead of creating new ones
+    zombies.forEach(zombie => {
+        const randomX = Math.random() * width - width / 2;
+        const randomZ = Math.random() * length - length / 2;
+        zombie.fbx.position.set(randomX, 0, randomZ);
+        zombie.isDead = false;
+        zombie.life = 10;
+        zombie.actionChosen = false;
+        zombie.chosenAction = null;
+        
+        // Reset animations
+        if (zombie.runAction) {
+            switchAction(zombie, zombie.runAction);
+        }
+    });
+
+    // Reset player position
+    controls.object.position.set(80, 2, 80);
+    
+    // Lock controls again to resume the game
+    controls.lock();
 }
 
 
@@ -758,6 +905,8 @@ function addStructures() {
     }
 }
 
+
+
 function getRandomAction(zombie, actions) {
     actions = actions.filter(action => action); // Filter out undefined actions
     const randomIndex = Math.floor(Math.random() * actions.length);
@@ -775,67 +924,132 @@ function switchAction(zombie, toAction) {
     }
 }
 
-function handleZombies(delta){
+
+function avoidObstacles(zombiePosition, directionToPlayer, obstacles, zombieSpeed, delta) {
+    const avoidanceForce = new THREE.Vector3();
+    const avoidanceStrength = 10; // Increased from 5
+    const minimumSeparation = 2; // Minimum distance to keep from obstacles
+
+    // Create a slightly larger bounding box for the zombie
+    const zombieBox = new THREE.Box3().setFromCenterAndSize(zombiePosition, new THREE.Vector3(3, 3, 3));
+
+    let avoiding = false;
+
+    obstacles.forEach(obstacle => {
+        if (obstacle.boundingBox.intersectsBox(zombieBox)) {
+            avoiding = true;
+
+            const closestPoint = obstacle.boundingBox.clampPoint(zombiePosition, new THREE.Vector3());
+            const avoidDirection = new THREE.Vector3().subVectors(zombiePosition, closestPoint).normalize();
+            
+            // Calculate distance to obstacle surface
+            const distanceToObstacle = zombiePosition.distanceTo(closestPoint);
+            
+            // Apply stronger avoidance force when very close to obstacle
+            const scaleFactor = Math.max(0, minimumSeparation - distanceToObstacle) * avoidanceStrength;
+            
+            avoidanceForce.add(avoidDirection.multiplyScalar(scaleFactor));
+        }
+    });
+
+    if (avoiding && avoidanceForce.length() > 0) {
+        const blendedDirection = new THREE.Vector3()
+            .addVectors(directionToPlayer, avoidanceForce)
+            .normalize();
+
+        // Use raycasting to check for collisions along the path
+        // Now apply movement and check validity with bounding boxes
+        const newPosition = zombiePosition.clone().add(blendedDirection.multiplyScalar(zombieSpeed * delta));
+        const newZombieBox = new THREE.Box3().setFromCenterAndSize(newPosition, new THREE.Vector3(3, 3, 3));
+
+        // Check if the new position is valid
+        const canMove = !obstacles.some(obstacle => obstacle.boundingBox.intersectsBox(newZombieBox));
+
+        if (canMove) {
+            // Update the zombie's position if valid
+            zombiePosition.copy(newPosition);
+        }
+
+
+        return blendedDirection.multiplyScalar(zombieSpeed * delta);
+    }
+
+    return directionToPlayer.multiplyScalar(zombieSpeed * delta);
+}
+
+function handleZombies(delta) {
     zombies.forEach(zombie => {
         const { fbx, mixer } = zombie;
         if (mixer) mixer.update(delta);
 
         const zombiePosition = new THREE.Vector3();
-        const cameraPosition = new  THREE.Vector3(controls.object.position.x, 0, controls.object.position.z);
+        const cameraPosition = new THREE.Vector3(controls.object.position.x, 0, controls.object.position.z);
         fbx.getWorldPosition(zombiePosition);
-  
-        
 
         const direction = new THREE.Vector3().subVectors(cameraPosition, zombiePosition).normalize();
         fbx.lookAt(cameraPosition);
 
         const distanceToCamera = zombiePosition.distanceTo(cameraPosition);
-        console.log(distanceToCamera)
+        console.log(distanceToCamera);
 
-
+        // Handle zombie death
         if (!zombie.isDead && isShiftPressed) {
             zombie.life--;
             console.log(`Zombie life: ${zombie.life}`);
 
             if (zombie.life <= 0) {
-                console.log('Zombie is dying');
                 zombie.isDead = true;
-
-                const actions = [zombie.Dying1, zombie.Dying2]; 
+                const actions = [zombie.Dying1, zombie.Dying2];
                 zombie.chosenAction = getRandomAction(zombie, actions);
                 switchAction(zombie, zombie.chosenAction);
-                return; 
+                return;
             }
         }
 
+        // If the zombie is dead, handle death animations and removal
         if (zombie.isDead) {
-
             if (zombie.chosenAction && !zombie.chosenAction.isRunning()) {
                 scene.remove(zombie.fbx);
-                zombies.splice(zombies.indexOf(zombie), 1); 
+                zombies.splice(zombies.indexOf(zombie), 1);
             }
-            return; 
+            return;
         }
 
-     
+        // Smooth zombie movement when alive and distance is greater than minimum
         if (distanceToCamera > minimumDistance) {
-            zombie.actionChosen = false; 
-            fbx.position.add(direction.multiplyScalar(zombieSpeed*delta)); 
+            zombie.actionChosen = false;
+            const avoidanceDirection = avoidObstacles(zombiePosition, direction, obstacles, zombieSpeed, delta);
 
-     
-            if (zombie.runAction) {
-                zombie.runAction.timeScale = zombieSpeed/16;
-
-                switchAction(zombie, zombie.runAction);
+            // Ensure the avoidance direction is valid and apply it
+            if (!isNaN(avoidanceDirection.x) && !isNaN(avoidanceDirection.y) && !isNaN(avoidanceDirection.z)) {
+                const newPosition = zombiePosition.clone().add(avoidanceDirection);
                 
+                // Check if the new position is valid (not inside any obstacle)
+                const newZombieBox = new THREE.Box3().setFromCenterAndSize(newPosition, new THREE.Vector3(2, 2, 2));
+                const canMove = !obstacles.some(obstacle => obstacle.boundingBox.intersectsBox(newZombieBox));
+                
+                if (canMove) {
+                    fbx.position.copy(newPosition);
+                }
+            }
+
+            // Adjust running animation based on speed
+            if (zombie.runAction) {
+                zombie.runAction.timeScale = zombieSpeed / 16;
+                switchAction(zombie, zombie.runAction);
             }
         } else {
 
-            const actions = [
-                zombie.punchAction,
-                zombie.biteAction,
-                zombie.biteNeckAction
-            ];
+            if (playerLife > 0) {
+                playerLife -= 0.5 * delta; // Decrement by 0.5 per second
+                updateLifeBar(); // Update the life bar based on player's life
+                if (playerLife <= 0) {
+                    playerLife = 0;
+                    alert('Game Over'); // End game if player's life reaches zero
+                }
+            }
+            // Handle attacking actions if close to the player
+            const actions = [zombie.punchAction, zombie.biteAction, zombie.biteNeckAction];
             if (!zombie.actionChosen) {
                 zombie.chosenAction = getRandomAction(zombie, actions);
                 zombie.actionChosen = true;
@@ -847,6 +1061,8 @@ function handleZombies(delta){
         }
     });
 }
+
+
        
         let moveForward = false;
         let moveBackward = false;
@@ -934,7 +1150,13 @@ function handleZombies(delta){
         const clock = new THREE.Clock();
         function animate() {
             const delta = clock.getDelta();
-            handleZombies(delta);
+            if (!isGameOver) {
+                handleZombies(delta);
+                // ... (rest of your animate function)
+            }
+            
+            checkGameOver();
+            
            
             requestAnimationFrame(animate);
 
@@ -942,7 +1164,7 @@ function handleZombies(delta){
 
                
 
-                const moveSpeed = 10;
+                const moveSpeed = 20;
                 const velocity = new THREE.Vector3();
 
                 if (moveForward) velocity.z += moveSpeed * delta;
@@ -1013,6 +1235,7 @@ function handleZombies(delta){
                 updateSkyColor();
 
                 updateMinimap();
+              
 
             renderer.render(scene, camera);
            
