@@ -32,7 +32,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true; // Enable shadows
 renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Use soft shadows
 document.body.appendChild(renderer.domElement);
-let zombieSpeed = 0.05; // Speed at which the zombie runs
+let zombieSpeed = 10.4; // Speed at which the zombie runs
 let minimumDistance = 1.5; // Distance at which the zombie stops running and can punch
 const width=800;
 const length = 800;
@@ -124,7 +124,7 @@ createTerrain();
         
 const createZombie = (skin, position) => {
     loader.load(skin, (fbx) => {
-        fbx.scale.setScalar(0.09);
+        fbx.scale.setScalar(0.03);
         fbx.position.copy(position);
         fbx.name = 'Zombie';
         scene.add(fbx);
@@ -512,7 +512,7 @@ function getTerrainHeight(x, z, terrainGeometry, terrainWidth, terrainLength, re
 
 
 function addTrees() {
-    const treeCount = width*0.25; // Number of trees
+    const treeCount = width*0.025; // Number of trees
     const textureLoader = new THREE.TextureLoader();
     
     // Load the bump map texture
@@ -600,7 +600,7 @@ function addTrees() {
 }
 
 addTrees();
-createZombie('/Warzombie.fbx', new THREE.Vector3(controls.object.position.x,0, controls.object.position.z+200));
+createZombie('/Warzombie.fbx', new THREE.Vector3(50,0,200));
      
 
 function addStructures() {
@@ -775,20 +775,22 @@ function switchAction(zombie, toAction) {
     }
 }
 
-function handleZombies(delta,controls){
+function handleZombies(delta){
     zombies.forEach(zombie => {
         const { fbx, mixer } = zombie;
         if (mixer) mixer.update(delta);
 
         const zombiePosition = new THREE.Vector3();
-        const cameraPosition = new  THREE.Vector3(controls.object.position.x, controls.object.position.y, controls.object.position.z);
+        const cameraPosition = new  THREE.Vector3(controls.object.position.x, 0, controls.object.position.z);
         fbx.getWorldPosition(zombiePosition);
+  
         
 
         const direction = new THREE.Vector3().subVectors(cameraPosition, zombiePosition).normalize();
         fbx.lookAt(cameraPosition);
 
         const distanceToCamera = zombiePosition.distanceTo(cameraPosition);
+        console.log(distanceToCamera)
 
 
         if (!zombie.isDead && isShiftPressed) {
@@ -818,11 +820,14 @@ function handleZombies(delta,controls){
      
         if (distanceToCamera > minimumDistance) {
             zombie.actionChosen = false; 
-            fbx.position.add(direction.multiplyScalar(zombieSpeed)); 
+            fbx.position.add(direction.multiplyScalar(zombieSpeed*delta)); 
 
      
             if (zombie.runAction) {
+                zombie.runAction.timeScale = zombieSpeed/16;
+
                 switchAction(zombie, zombie.runAction);
+                
             }
         } else {
 
@@ -929,7 +934,7 @@ function handleZombies(delta,controls){
         const clock = new THREE.Clock();
         function animate() {
             const delta = clock.getDelta();
-            handleZombies(delta,controls);
+            handleZombies(delta);
            
             requestAnimationFrame(animate);
 
@@ -1010,7 +1015,7 @@ function handleZombies(delta,controls){
                 updateMinimap();
 
             renderer.render(scene, camera);
-            console.log(obstacles)
+           
         }
         animate();
 
