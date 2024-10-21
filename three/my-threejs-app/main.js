@@ -1,6 +1,21 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 
+
+// Loading Manager to track progress
+const loadingManager = new THREE.LoadingManager(
+    () => {
+        // Hide loading screen when loading is complete
+        document.getElementById('loading-screen').style.display = 'none';
+    },
+    (itemUrl, itemsLoaded, itemsTotal) => {
+        // Update the progress bar
+        const progress = (itemsLoaded / itemsTotal) * 100;
+        document.getElementById('progress-bar').style.width = `${progress}%`;
+    }
+);
+
+
 // Scene setup
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -25,7 +40,7 @@ const plane = new THREE.Mesh(planeGeometry, planeMaterial);
 plane.rotation.x = -Math.PI / 2;
 scene.add(plane);
 
-const loader = new FBXLoader();
+const loader = new FBXLoader(loadingManager);
 const zombies = []; // Array to hold all zombies
 const clock = new THREE.Clock(); // Create a clock to manage time deltas
 
