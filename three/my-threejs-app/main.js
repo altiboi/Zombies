@@ -37,11 +37,85 @@ let minimumDistance = 1.5; // Distance at which the zombie stops running and can
 const width=800;
 const length = 800;
 const zombies = [];
+const obstacles = [];
 const loader = new FBXLoader(loadingManager); 
+const controls = new PointerLockControls(camera, document.body);
 
 
-addSun()
-addMoon()
+//MINIMAP SECTION
+const minimapCanvas = document.createElement('canvas');
+minimapCanvas.width = 200;
+minimapCanvas.height = 200;
+minimapCanvas.style.position = 'absolute';
+minimapCanvas.style.bottom = '10px';
+minimapCanvas.style.left = '10px';
+minimapCanvas.style.border = '2px solid white';
+document.body.appendChild(minimapCanvas);
+const minimapContext = minimapCanvas.getContext('2d');
+
+// Function to convert 3D world coordinates to 2D minimap coordinates
+function worldToMinimap(x, z) {
+  const minimapX = ((x + width / 2) / width) * minimapCanvas.width;
+  const minimapZ = ((z + length / 2) / length) * minimapCanvas.height;
+  return { x: minimapX, y: minimapZ };
+}
+
+// Function to update the minimap
+function updateMinimap() {
+  // Clear the minimap
+  minimapContext.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+
+  // Draw the terrain outline
+  minimapContext.beginPath();
+  minimapContext.moveTo(-width / 2, -length / 2);
+  minimapContext.lineTo(-width / 2, length / 2);
+  minimapContext.lineTo(width / 2, length / 2);
+  minimapContext.lineTo(width / 2, -length / 2);
+  minimapContext.closePath();
+  minimapContext.strokeStyle = 'white';
+  minimapContext.stroke();
+
+  // Draw the structures
+  minimapContext.fillStyle = 'grey';
+  obstacles.forEach(obstacle => {
+    const { x, y } = worldToMinimap(
+      obstacle.boundingBox.min.x,
+      obstacle.boundingBox.min.z
+    );
+    const width = worldToMinimap(
+      obstacle.boundingBox.max.x,
+      obstacle.boundingBox.min.z
+    ).x - x;
+    const height = worldToMinimap(
+      obstacle.boundingBox.min.x,
+      obstacle.boundingBox.max.z
+    ).y - y;
+    minimapContext.fillRect(x, y, width, height);
+  });
+
+  // Draw the player marker
+  const { x, y } = worldToMinimap(
+    controls.object.position.x,
+    controls.object.position.z
+  );
+  minimapContext.save();
+  minimapContext.translate(x, y);
+  minimapContext.rotate(-controls.object.rotation.y);
+  minimapContext.beginPath();
+  minimapContext.moveTo(0, 0);
+  minimapContext.lineTo(10 * Math.cos(Math.PI / 4), 10 * Math.sin(Math.PI / 4));
+  minimapContext.lineTo(10 * Math.cos(3 * Math.PI / 4), 10 * Math.sin(3 * Math.PI / 4));
+  minimapContext.closePath();
+  minimapContext.fillStyle = 'red';
+  minimapContext.fill();
+  minimapContext.restore();
+}
+
+
+
+
+addSun();
+addMoon();
 addSky();
 addClouds();
 addStars();
@@ -207,7 +281,7 @@ function createTerrain() {
             const vertices = terrainGeometry.attributes.position.array;
             for (let i = 0, j = 0, l = vertices.length; i < l; i++, j += 3) {
                 const heightValue = imageData.data[i * 4]; // Assuming grayscale image, use only the red channel
-                vertices[j + 2] = heightValue / 20; // Adjust the division factor to control the terrain height
+                vertices[j + 2] = 0; // Adjust the division factor to control the terrain height, i made it 0 to make the terrain flat for now
             }
 
             // Update normals to account for the new vertex positions
@@ -230,6 +304,11 @@ function createTerrain() {
             // Optionally, create walls around the terrain
             createWall(terrainGeometry);
             addStructures();
+             // Set up controls
+
+     
+ 
+ 
         });
     });
 }
@@ -430,62 +509,8 @@ function getTerrainHeight(x, z, terrainGeometry, terrainWidth, terrainLength, re
       }
     }
 
-    const obstacles = [];
 
-    function createTower(x, z) {
-    const baseHeight = 50;
-    
-    // Create the base of the lighthouse (cylinder shape)
-    const baseGeometry = new THREE.CylinderGeometry(10, 14, baseHeight, 32);
-    const baseMaterial = new THREE.MeshPhongMaterial({ color: 0x964B00 });
-    const base = new THREE.Mesh(baseGeometry, baseMaterial);
-    base.position.set(x, baseHeight / 2, z);
-    base.castShadow = true; // Enable casting shadows
-    base.receiveShadow = true; // Enable receiving shadows
-    scene.add(base);
 
-    // Create the top of the lighthouse (light housing)
-    const topHeight = 5;
-    const topGeometry = new THREE.CylinderGeometry(5, 5, topHeight, 16);
-    const topMaterial = new THREE.MeshPhongMaterial({ color: 0xFFD700 });
-    const top = new THREE.Mesh(topGeometry, topMaterial);
-    top.position.set(x, baseHeight + topHeight / 2, z);
-    top.castShadow = true;
-    top.receiveShadow = true;
-    scene.add(top);
-
-    // Add a dome on top of the light housing
-    const domeGeometry = new THREE.SphereGeometry(4, 16, 16, 0, Math.PI);
-    const domeMaterial = new THREE.MeshPhongMaterial({ color: 0xCCCCCC });
-    const dome = new THREE.Mesh(domeGeometry, domeMaterial);
-    dome.position.set(x, baseHeight + topHeight + 2.5, z); // Positioned at the top of the housing
-    dome.castShadow = true;
-    dome.receiveShadow = true;
-    scene.add(dome);
-
-    // Create the light source at the top of the lighthouse
-    const lighthouseLight = new THREE.PointLight(0xffffff,  1, 500); // White light, intensity 1, range 500
-    lighthouseLight.position.set(x, baseHeight + topHeight + 5, z);
-    lighthouseLight.castShadow = true;
-    scene.add(lighthouseLight);
-
-    // Optionally, add a small bulb or light representation
-    const bulbGeometry = new THREE.SphereGeometry(1, 16, 16);
-    const bulbMaterial = new THREE.MeshBasicMaterial({
-        color:  0xFFFF00, // Dim during the day, glowing yellow at night
-        emissive:0xFFFF00, // No glow during day, neon glow at night
-        emissiveIntensity:  1, // Intense glow at night
-        toneMapped: false, // Keeps glow intensity even under HDR
-    });
-
-    const bulb = new THREE.Mesh(bulbGeometry, bulbMaterial);
-    bulb.position.set(x, baseHeight + topHeight + 5, z);
-    scene.add(bulb);
-
-    // Add bounding boxes for the lighthouse
-    const towerBoundingBox = new THREE.Box3().setFromObject(base);
-    obstacles.push({ mesh: base, boundingBox: towerBoundingBox });
-}
 function addTrees() {
     const treeCount = width*0.25; // Number of trees
     const textureLoader = new THREE.TextureLoader();
@@ -575,6 +600,8 @@ function addTrees() {
 }
 
 addTrees();
+createZombie('/Warzombie.fbx', new THREE.Vector3(controls.object.position.x,0, controls.object.position.z+200));
+     
 
 function addStructures() {
     const structureCount = width * 0.01;
@@ -815,22 +842,7 @@ function handleZombies(delta,controls){
         }
     });
 }
-
-
-
-
-        
-      
-
-
-        // Set up controls
-        const controls = new PointerLockControls(camera, document.body);
-
-        createZombie('/Warzombie.fbx', new THREE.Vector3(controls.object.position.x, 0, controls.object.position.z+200));
-        createZombie('/YakuZombie.fbx', new THREE.Vector3(controls.object.position.x+200, 0, controls.object.position.z));
-        createZombie('/Zombiegirl.fbx', new THREE.Vector3(controls.object.position.x-200, 0, controls.object.position.z-200));
-
-
+       
         let moveForward = false;
         let moveBackward = false;
         let moveLeft = false;
@@ -993,12 +1005,12 @@ function handleZombies(delta,controls){
             
                 animateSun();
                 animateMoon();
-                updateSkyColor()
-               // controls.getObject().position.set(0, 100, 0); // Set initial camera position when locking
+                updateSkyColor();
 
-           
+                updateMinimap();
 
             renderer.render(scene, camera);
+            console.log(obstacles)
         }
         animate();
 
