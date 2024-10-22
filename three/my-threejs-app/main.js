@@ -35,7 +35,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true; // Enable shadows
 renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Use soft shadows
 document.body.appendChild(renderer.domElement);
-let zombieSpeed = 10.4; // Speed at which the zombie runs
+let zombieSpeed = 10; // Speed at which the zombie runs
 let minimumDistance = 1.5; // Distance at which the zombie stops running and can punch
 const width=800;
 const length = 800;
@@ -43,6 +43,23 @@ const zombies = [];
 const obstacles = [];
 const loader = new FBXLoader(loadingManager); 
 const controls = new PointerLockControls(camera, document.body);
+
+const MalescreamSound = new Audio('scream.mp3'); // Replace with your audio file path
+MalescreamSound.volume = 0.5; // Set volume to 70%
+
+const forestSound = new Audio('forest.mp3'); // Replace with your audio file path
+forestSound.loop = true; // Loop the sound for continuous play
+forestSound.volume = 0.4; // Set volume to 70%
+
+
+// Function to start playing the background sound
+function startBackgroundSound() {
+    forestSound.play().catch(error => {
+        console.error("Error playing forest sound:", error);
+    });
+}
+
+
 
 
 
@@ -158,13 +175,13 @@ document.body.appendChild(killCount);
 
 function updateKillCount() {
     kills++;
-    killAndLevelDisplay.innerHTML = `Kills: ${kills}<br style="display:none;>Level: ${currentLevel}`;
+    killCount.innerHTML = `Kills: ${kills}<br style="display:none;>Level: ${currentLevel}`;
 
 }
 
 function updateLevel(){
     currentLevel++
-    killAndLevelDisplay.innerHTML = `Kills: ${kills}<br style="display:none;>Level: ${currentLevel}`;
+    killCount.innerHTML = `Kills: ${kills}<br style="display:none;>Level: ${currentLevel}`;
 
 }
 
@@ -175,9 +192,17 @@ function updateLifeBar() {
 
     if (lifePercentage <= 50) {
         lifeBar.style.backgroundColor = 'yellow'; // Change color when life is low
+        
+        MalescreamSound.pause();
+        MalescreamSound.currentTime = 0;
+        
     }
-    if (lifePercentage <= 20) {
+    if (lifePercentage <= 30) {
         lifeBar.style.backgroundColor = 'red'; // Critical life level
+        MalescreamSound.play().catch(error => {
+            console.error("Error playing scream sound:", error);
+        });
+        
     }
 }
 
@@ -218,6 +243,9 @@ function checkGameOver() {
         playerLife = 0;
         updateLifeBar();
         showGameOverScreen();
+
+        forestSound.pause();
+        forestSound.currentTime = 0;
     }
 }
 
@@ -226,37 +254,12 @@ function showGameOverScreen() {
     gameOverScreen.style.display = 'block';
 }
 
-
 function restartGame() {
-    isGameOver = false;
-    playerLife = 5; // Reset player life
-    kills = 0; // Reset kill count
-    updateLifeBar();
-    updateKillCount();
-    gameOverScreen.style.display = 'none';
     
-    // Reposition existing zombies instead of creating new ones
-    zombies.forEach(zombie => {
-        const randomX = Math.random() * width - width / 2;
-        const randomZ = Math.random() * length - length / 2;
-        zombie.fbx.position.set(randomX, 0, randomZ);
-        zombie.isDead = false;
-        zombie.life = 10;
-        zombie.actionChosen = false;
-        zombie.chosenAction = null;
-        
-        // Reset animations
-        if (zombie.runAction) {
-            switchAction(zombie, zombie.runAction);
-        }
-    });
-
-    // Reset player position
-    controls.object.position.set(80, 2, 80);
-    
-    // Lock controls again to resume the game
-    controls.lock();
+        window.location.reload();
+  
 }
+
 
 
 
@@ -748,7 +751,7 @@ function addTrees() {
 
 addTrees();
 function addZombies(playerPosition) {
-    const zombieCount = width * 0.01 + currentLevel; // Adjust based on desired density
+    const zombieCount = width * 0.01 * currentLevel; // Adjust based on desired density
     const maxAttempts = zombieCount * 10; // Maximum attempts to find valid positions
     let placedZombies = 0;
     let attempts = 0;
@@ -762,7 +765,7 @@ function addZombies(playerPosition) {
         const distanceToPlayer = Math.sqrt(Math.pow(playerPosition.x - x, 2) + Math.pow(playerPosition.z - z, 2));
 
         // Ensure the zombie is at least 150 units away from the player's position
-        if (distanceToPlayer < 150) {
+        if (distanceToPlayer < 50) {
             continue; // Skip this iteration if the zombie is too close to the player
         }
 
@@ -1186,6 +1189,8 @@ function handleZombies(delta) {
         document.addEventListener('keyup', onKeyUp);
 
         document.addEventListener('click', function () {
+            startBackgroundSound();
+
             controls.lock();
         });
 
