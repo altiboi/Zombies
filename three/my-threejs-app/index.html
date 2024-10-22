@@ -93,6 +93,24 @@
         height: 100%;
         background: #00ff00;
       }
+      .overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 88px; /* Adjust the size as needed */
+            color: white; /* Text color */
+            background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
+            padding: 20px;
+            border-radius: 10px;
+            display: none; /* Initially hidden */
+            z-index: 100; /* Ensure it appears above other elements */
+        }
+
+        #playSign {
+            color: green; /* Play sign color */
+            display: none; /* Initially hidden */
+        }
     </style>
   </head>
   <body>
@@ -114,6 +132,9 @@
           <div id="progress-bar"></div>
         </div>
       </div>
+
+      <div id="pauseSign" class="overlay">PAUSED</div>
+      <div id="playSign" class="overlay">PLAY</div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
     <script type="module" src="/main.js"></script>
   </body>

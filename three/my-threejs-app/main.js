@@ -22,10 +22,153 @@ const loadingManager = new THREE.LoadingManager(
 let sun, moon, sunMesh, moonMesh,  sky, clouds, stars, terrainGeometry;
 let daySkyMaterial, nightSkyMaterial;
 let playerLife = 5; // Player starts with 5 life points
+let moveSpeed = 20;
 let kills = 0;
 let currentLevel = 1;
 let isGameOver = false;
 let gameOverScreen;
+let isPaused = false; // Game pause state
+const pauseSign = document.getElementById('pauseSign');
+const playSign = document.getElementById('playSign');
+
+
+const powerUps = []; // Array to store active power-ups
+
+
+function pauseGame() {
+    isPaused = true; // Set the pause state to true
+    pauseSign.style.display = 'block'; // Show the pause sign
+        playSign.style.display = 'none'; // Hide the play sign
+        clock.stop(); // Stop the clock when paused
+    console.log('Game Paused');
+    // Optionally, display a pause menu or overlay here
+}
+
+// Function to resume the game
+function resumeGame() {
+    isPaused = false; // Set the pause state to false
+    console.log('Game Resumed');
+    pauseSign.style.display = 'none'; // Hide the pause sign
+        playSign.style.display = 'block'; // Show the play sign
+        clock.start(); // Resume the clock
+        
+        // Hide the play sign after 1 second
+        setTimeout(() => {
+            playSign.style.display = 'none'; // Hide the play sign after 1 second
+        }, 1000);
+    animate(); // Restart the render loop
+}
+
+
+const powerUpTypes = {
+    ZOMBIE_SLOWDOWN: 'zombieSlowdown',
+    PLAYER_SPEEDUP: 'playerSpeedup',
+    HEALTH_BOOST: 'healthBoost',
+};
+
+class PowerUp {
+    constructor(type, position,scene) {
+        this.type = type;
+        this.position = position;
+        this.isActive = true;
+        this.scene = scene
+
+        
+        this.mesh =null;
+        this.loadModel(loadPowerUp);
+      
+
+       
+    }
+
+    loadModel(loader) {
+        let scalar,modelPath;
+
+        // Define the path to the 3D model file based on power-up type
+        switch (this.type) {
+            case powerUpTypes.ZOMBIE_SLOWDOWN:
+                modelPath = './shell.glb'; // Path to zombie slowdown model
+                scalar = 0.0018;
+                break;
+                
+            case powerUpTypes.PLAYER_SPEEDUP:
+                modelPath = './lightning.glb'; // Path to player speedup model
+                scalar = 2;
+                break;
+            case powerUpTypes.HEALTH_BOOST:
+                modelPath = '/medicines.glb'; // Path to health boost model
+                scalar = 0.05;
+                break;
+            default:
+                console.error('Unknown power-up type');
+                return;
+        }
+
+        // Load the 3D model using GLTFLoader
+        loader.load(modelPath, (gltf) => {
+            this.mesh = gltf.scene;
+            this.mesh.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = child.material.clone(); // Clone the original material to preserve it
+                }
+            });
+        
+            // Add the original mesh to the scene (with base colors/textures)
+            this.mesh.position.copy(this.position);
+            this.mesh.scale.setScalar(scalar);
+            this.scene.add(this.mesh);
+        
+            // Create the glow effect on top of the original model
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff,    // Yellow glow or change per power-up type
+                transparent: true,
+                opacity: 0.9,       // Adjust opacity for glowing effect
+            });
+        
+            // Create a duplicate mesh for the glow
+            const glowMesh = new THREE.Mesh(this.mesh.geometry.clone(), glowMaterial);
+            glowMesh.scale.multiplyScalar(1.05);  // Slightly larger than original mesh for glow effect
+        
+            this.scene.add(this.mesh);
+        }, undefined, (error) => {
+            console.error('An error occurred while loading the model:', error);
+        });
+    }
+
+
+    // Collect the power-up
+    
+
+    // Function to apply power-up effects
+applyPowerUpEffect(type) {
+    switch (type) {
+        case powerUpTypes.ZOMBIE_SLOWDOWN:
+            zombieSpeed *= 0.5; // Slow down zombies
+            console.log('Zombies slowed down!');
+            break;
+        case powerUpTypes.PLAYER_SPEEDUP:
+            moveSpeed *= 1.5; // Speed up player
+            console.log('Player speed increased!');
+            break;
+        case powerUpTypes.HEALTH_BOOST:
+            playerLife = Math.min(playerLife + 1, 5); // Heal player, max life is 5
+            console.log('Player health boosted!');
+            updateLifeBar()
+            break;
+        default:
+            break;
+    }
+}
+
+collect() {
+    this.isActive = false;
+    this.scene.remove(this.mesh); // Remove the mesh from the scene
+    this.applyPowerUpEffect(this.type); // Apply the power-up effect
+}
+
+}
+
+
 
 
 // Set up the scene, camera, and renderer
@@ -38,14 +181,33 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true; // Enable shadows
 renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Use soft shadows
 document.body.appendChild(renderer.domElement);
-let zombieSpeed = 10.4; // Speed at which the zombie runs
+let zombieSpeed = 10; // Speed at which the zombie runs
 let minimumDistance = 1.5; // Distance at which the zombie stops running and can punch
 const width=800;
 const length = 800;
 const zombies = [];
 const obstacles = [];
 const loader = new FBXLoader(loadingManager); 
+const loadPowerUp = new GLTFLoader(loadingManager); 
+
 const controls = new PointerLockControls(camera, document.body);
+
+const MalescreamSound = new Audio('scream.mp3'); // Replace with your audio file path
+MalescreamSound.volume = 0.5; // Set volume to 70%
+
+const forestSound = new Audio('forest.mp3'); // Replace with your audio file path
+forestSound.loop = true; // Loop the sound for continuous play
+forestSound.volume = 0.4; // Set volume to 70%
+
+
+// Function to start playing the background sound
+function startBackgroundSound() {
+    forestSound.play().catch(error => {
+        console.error("Error playing forest sound:", error);
+    });
+}
+
+
 scene.add(controls.object);
 
 // Initialize Cannon.js physics world
@@ -180,19 +342,19 @@ killCount.style.border = '3px solid #888';
 killCount.style.boxShadow = '0 0 10px #000';
 killCount.style.padding = '5px';
 killCount.style.imageRendering = 'pixelated'; // Retro pixelated effect
-killCount.textContent = `Kills: 0<br>Level: 1`; // Initial kill count
+killCount.innerHTML = `Kills: 0<br>Level: 1`; // Initial kill count
 
 document.body.appendChild(killCount);
 
 function updateKillCount() {
     kills++;
-    killAndLevelDisplay.innerHTML = `Kills: ${kills}<br style="display:none;>Level: ${currentLevel}`;
+    killCount.innerHTML = `Kills: ${kills}<br style="display:none;>Level: ${currentLevel}`;
 
 }
 
 function updateLevel(){
     currentLevel++
-    killAndLevelDisplay.innerHTML = `Kills: ${kills}<br style="display:none;>Level: ${currentLevel}`;
+    killCount.innerHTML = `Kills: ${kills}<br style="display:none;>Level: ${currentLevel}`;
 
 }
 
@@ -203,9 +365,17 @@ function updateLifeBar() {
 
     if (lifePercentage <= 50) {
         lifeBar.style.backgroundColor = 'yellow'; // Change color when life is low
+        
+        MalescreamSound.pause();
+        MalescreamSound.currentTime = 0;
+        
     }
-    if (lifePercentage <= 20) {
+    if (lifePercentage <= 30) {
         lifeBar.style.backgroundColor = 'red'; // Critical life level
+        MalescreamSound.play().catch(error => {
+            console.error("Error playing scream sound:", error);
+        });
+        
     }
 }
 
@@ -246,6 +416,9 @@ function checkGameOver() {
         playerLife = 0;
         updateLifeBar();
         showGameOverScreen();
+
+        forestSound.pause();
+        forestSound.currentTime = 0;
     }
 }
 
@@ -254,37 +427,12 @@ function showGameOverScreen() {
     gameOverScreen.style.display = 'block';
 }
 
-
 function restartGame() {
-    isGameOver = false;
-    playerLife = 5; // Reset player life
-    kills = 0; // Reset kill count
-    updateLifeBar();
-    updateKillCount();
-    gameOverScreen.style.display = 'none';
     
-    // Reposition existing zombies instead of creating new ones
-    zombies.forEach(zombie => {
-        const randomX = Math.random() * width - width / 2;
-        const randomZ = Math.random() * length - length / 2;
-        zombie.fbx.position.set(randomX, 0, randomZ);
-        zombie.isDead = false;
-        zombie.life = 10;
-        zombie.actionChosen = false;
-        zombie.chosenAction = null;
-        
-        // Reset animations
-        if (zombie.runAction) {
-            switchAction(zombie, zombie.runAction);
-        }
-    });
-
-    // Reset player position
-    controls.object.position.set(80, 2, 80);
-    
-    // Lock controls again to resume the game
-    controls.lock();
+        window.location.reload();
+  
 }
+
 
 
 
@@ -333,7 +481,6 @@ const createZombie = (skin, position) => {
             zombieData.Dying1 = mixer.clipAction(fb.animations[0]);
             zombieData.Dying1.loop = THREE.LoopOnce; // Set loop mode to LoopOnce
             zombieData.Dying1.clampWhenFinished = true; // Ensure the animation doesn't reset
-            console.log('Dying animation loaded:', zombieData.Dying1);
         });
         loader.load('/Zombie_Death.fbx', (fb) => {
             zombieData.Dying2 = mixer.clipAction(fb.animations[0]);
@@ -1070,13 +1217,72 @@ function addTrees() {
 }
 
 addTrees();
-createZombie('/Warzombie.fbx', new THREE.Vector3(50,20,200));
-createZombie('/Warzombie.fbx', new THREE.Vector3(50,20,210));
-createZombie('/Warzombie.fbx', new THREE.Vector3(50,20,220));
-createZombie('/Warzombie.fbx', new THREE.Vector3(50,20,230));
+function addZombies(playerPosition) {
+    const zombieCount = width * 0.01 * currentLevel; // Adjust based on desired density
+    const maxAttempts = zombieCount * 10; // Maximum attempts to find valid positions
+    let placedZombies = 0;
+    let attempts = 0;
+
+    while (placedZombies < zombieCount && attempts < maxAttempts) {
+        attempts++;
+        const x = Math.random() * width - width / 2;
+        const z = Math.random() * width - width / 2;
+
+        // Calculate the distance from the player to the potential zombie position
+        const distanceToPlayer = Math.sqrt(Math.pow(playerPosition.x - x, 2) + Math.pow(playerPosition.z - z, 2));
+
+        // Ensure the zombie is at least 150 units away from the player's position
+        if (distanceToPlayer < 50) {
+            continue; // Skip this iteration if the zombie is too close to the player
+        }
+
+        // Define the dimensions for the zombie bounding box
+        const zombieWidth = 2; // Adjust as needed
+        const zombieDepth = 2; // Adjust as needed
+
+        // Check if the space is clear for the zombie
+        if (!isSpaceClear(x, z, zombieWidth, zombieDepth)) {
+            continue; // Skip this iteration if the space is not clear
+        }
+
+        // Create the zombie using the createZombie function
+        createZombie('/Warzombie.fbx', new THREE.Vector3(x, 0, z));
+
+        // Increment the count of placed zombies
+        placedZombies++;
+    }
+
+    if (attempts >= maxAttempts) {
+        console.log('Max attempts reached, could not place all zombies.');
+    }
+}
+
+// Ensure that the isSpaceClear function is accessible
+function isSpaceClear(x, z, structureWidth, depth) {
+    const margin = 1; // Margin for the zombie bounding box
+    const checkBox = new THREE.Box3(
+        new THREE.Vector3(x - structureWidth / 2 - margin, 0, z - depth / 2 - margin),
+        new THREE.Vector3(x + structureWidth / 2 + margin, 100, z + depth / 2 + margin)
+    );
+
+    // Check against existing obstacles
+    for (let obstacle of obstacles) {
+        if (checkBox.intersectsBox(obstacle.boundingBox)) {
+            return false; // Space is not clear
+        }
+    }
+
+    return true; // Space is clear
+}
+
+addZombies(controls.object.position);
+
+
      
 
 function addStructures() {
+   
+
     const structureCount = width * 0.01;
     const textureLoader = new THREE.TextureLoader();
     // Load texture maps
@@ -1140,6 +1346,12 @@ function addStructures() {
 
         // Create a group to hold all parts of the structure
         const structureGroup = new THREE.Group();
+
+        const powerUpType = Object.values(powerUpTypes)[Math.floor(Math.random() * Object.keys(powerUpTypes).length)];
+        const powerUp = new PowerUp(powerUpType, new THREE.Vector3(x, terrainHeight + height * 0.1, z), scene,loadPowerUp);
+        powerUps.push(powerUp);
+        
+
 
         // Create walls with more segments for better displacement
         const wallGeometry = new THREE.BoxGeometry(1, height, depth, 1, 50, 50);
@@ -1256,6 +1468,28 @@ function addStructures() {
     }
 }
 
+function checkPowerUpCollection() {
+  
+    const player = controls.object.position;
+
+    for (let i = powerUps.length - 1; i >= 0; i--) {
+        const powerUp = powerUps[i];
+       
+
+        if (player.distanceTo(powerUp.position)<10 && powerUp.isActive) {
+            console.log('player speed before:'+moveSpeed + "\n"+ 'zombiespeed before :'+zombieSpeed + "\n"+'player health before:'+playerLife)
+
+            
+            powerUp.collect(moveSpeed,zombieSpeed,playerLife); // Collect the power-up
+            powerUps.splice(i, 1); // Remove from the active list
+            updateLifeBar(); // Update the life bar
+
+            console.log('powerup activated!!:'+powerUp.type)
+            console.log('player speed after:'+moveSpeed + "\n"+ 'zombiespeed after:'+zombieSpeed + "\n"+'player health after:'+playerLife)
+        }
+    }
+}
+
 
 
 function getRandomAction(zombie, actions) {
@@ -1341,7 +1575,6 @@ function handleZombies(delta) {
         fbx.lookAt(cameraPosition);
 
         const distanceToCamera = zombiePosition.distanceTo(cameraPosition);
-        console.log(distanceToCamera);
 
         // Handle zombie death
         if (!zombie.isDead && isShiftPressed) {
@@ -1736,9 +1969,17 @@ function checkIfOnGround() {
         const onKeyDown = function (event) {
             switch (event.code) {
                 case 'ShiftLeft':
-                    console.log("Shift is being pressed")
                     isShiftPressed = true;
                     break;
+            
+                case 'KeyP':
+                    if (isPaused) {
+                        resumeGame();
+                    } else {
+                        pauseGame();
+                    }
+                    break;
+
                 case 'KeyW':
                     moveForward = true;
                     break;
@@ -1785,6 +2026,8 @@ function checkIfOnGround() {
         document.addEventListener('keyup', onKeyUp);
 
         document.addEventListener('click', function () {
+            startBackgroundSound();
+
             controls.lock();
         });
 
@@ -1813,18 +2056,20 @@ function checkIfOnGround() {
             });
 
             if (!isGameOver) {
+            if (!isGameOver&&!isPaused) {
                 handleZombies(delta);
                 // ... (rest of your animate function)
             }
             
             checkGameOver();
             
-           
-            requestAnimationFrame(animate);
+            if (!isPaused) {
+
+                requestAnimationFrame(animate);
 
             // if (controls.isLocked === true) {
 
-               
+                
 
             //     const moveSpeed = 20;
             //     const velocity = new THREE.Vector3();
@@ -1894,10 +2139,12 @@ function checkIfOnGround() {
                 animateMoon();
                 updateSkyColor();
 
-                updateMinimap();
-              
+                    updateMinimap();
+                    checkPowerUpCollection();
+                
 
-            renderer.render(scene, camera);
+                renderer.render(scene, camera);
+            }
            
         }
         animate();
@@ -1906,5 +2153,6 @@ function checkIfOnGround() {
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
+
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
