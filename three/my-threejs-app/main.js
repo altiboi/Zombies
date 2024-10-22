@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import {PointerLockControls} from 'three/examples/jsm/controls/PointerLockControls.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
 
 
 
@@ -20,7 +22,7 @@ const loadingManager = new THREE.LoadingManager(
 let sun, moon, sunMesh, moonMesh,  sky, clouds, stars, terrainGeometry;
 let daySkyMaterial, nightSkyMaterial;
 let playerLife = 5; // Player starts with 5 life points
-const moveSpeed = 20;
+let moveSpeed = 20;
 let kills = 0;
 let currentLevel = 1;
 let isGameOver = false;
@@ -43,27 +45,68 @@ class PowerUp {
         this.isActive = true;
         this.scene = scene
 
-        // Create a visual representation for the power-up
-        const geometry = new THREE.SphereGeometry(1, 32, 32); // Sphere for power-up
-        const material = new THREE.MeshBasicMaterial({ color: this.getColor() });
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.position.copy(position);
-        scene.add(this.mesh);
+        
+        this.mesh =null;
+        this.loadModel(loadPowerUp);
+      
+
+       
     }
 
-    // Determine color based on power-up type
-    getColor() {
+    loadModel(loader) {
+        let scalar,modelPath;
+
+        // Define the path to the 3D model file based on power-up type
         switch (this.type) {
             case powerUpTypes.ZOMBIE_SLOWDOWN:
-                return 0xff0000; // Red for zombie slowdown
+                modelPath = './shell.glb'; // Path to zombie slowdown model
+                scalar = 0.0018;
+                break;
+                
             case powerUpTypes.PLAYER_SPEEDUP:
-                return 0x00ff00; // Green for player speedup
+                modelPath = './lightning.glb'; // Path to player speedup model
+                scalar = 2;
+                break;
             case powerUpTypes.HEALTH_BOOST:
-                return 0x0000ff; // Blue for health boost
+                modelPath = '/medicines.glb'; // Path to health boost model
+                scalar = 0.05;
+                break;
             default:
-                return 0xffffff; // Default color
+                console.error('Unknown power-up type');
+                return;
         }
+
+        // Load the 3D model using GLTFLoader
+        loader.load(modelPath, (gltf) => {
+            this.mesh = gltf.scene;
+            this.mesh.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = child.material.clone(); // Clone the original material to preserve it
+                }
+            });
+        
+            // Add the original mesh to the scene (with base colors/textures)
+            this.mesh.position.copy(this.position);
+            this.mesh.scale.setScalar(scalar);
+            this.scene.add(this.mesh);
+        
+            // Create the glow effect on top of the original model
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff,    // Yellow glow or change per power-up type
+                transparent: true,
+                opacity: 0.9,       // Adjust opacity for glowing effect
+            });
+        
+            // Create a duplicate mesh for the glow
+            const glowMesh = new THREE.Mesh(this.mesh.geometry.clone(), glowMaterial);
+            glowMesh.scale.multiplyScalar(1.05);  // Slightly larger than original mesh for glow effect
+        
+            this.scene.add(this.mesh);
+        }, undefined, (error) => {
+            console.error('An error occurred while loading the model:', error);
+        });
     }
+
 
     // Collect the power-up
     
@@ -117,6 +160,8 @@ const length = 800;
 const zombies = [];
 const obstacles = [];
 const loader = new FBXLoader(loadingManager); 
+const loadPowerUp = new GLTFLoader(loadingManager); 
+
 const controls = new PointerLockControls(camera, document.body);
 
 const MalescreamSound = new Audio('scream.mp3'); // Replace with your audio file path
@@ -244,7 +289,7 @@ killCount.style.border = '3px solid #888';
 killCount.style.boxShadow = '0 0 10px #000';
 killCount.style.padding = '5px';
 killCount.style.imageRendering = 'pixelated'; // Retro pixelated effect
-killCount.textContent = `Kills: 0<br>Level: 1`; // Initial kill count
+killCount.innerHTML = `Kills: 0<br>Level: 1`; // Initial kill count
 
 document.body.appendChild(killCount);
 
@@ -955,7 +1000,7 @@ function addStructures() {
         const structureGroup = new THREE.Group();
 
         const powerUpType = Object.values(powerUpTypes)[Math.floor(Math.random() * Object.keys(powerUpTypes).length)];
-        const powerUp = new PowerUp(powerUpType, new THREE.Vector3(x, terrainHeight + height * 0.1, z), scene);
+        const powerUp = new PowerUp(powerUpType, new THREE.Vector3(x, terrainHeight + height * 0.1, z), scene,loadPowerUp);
         powerUps.push(powerUp);
         
 
