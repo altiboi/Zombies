@@ -3,6 +3,7 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import {PointerLockControls} from 'three/examples/jsm/controls/PointerLockControls.js'
 
 
+
 // Loading Manager to track progress
 const loadingManager = new THREE.LoadingManager(
     () => {
@@ -19,10 +20,84 @@ const loadingManager = new THREE.LoadingManager(
 let sun, moon, sunMesh, moonMesh,  sky, clouds, stars, terrainGeometry;
 let daySkyMaterial, nightSkyMaterial;
 let playerLife = 5; // Player starts with 5 life points
+const moveSpeed = 20;
 let kills = 0;
 let currentLevel = 1;
 let isGameOver = false;
 let gameOverScreen;
+
+const powerUps = []; // Array to store active power-ups
+
+
+
+const powerUpTypes = {
+    ZOMBIE_SLOWDOWN: 'zombieSlowdown',
+    PLAYER_SPEEDUP: 'playerSpeedup',
+    HEALTH_BOOST: 'healthBoost',
+};
+
+class PowerUp {
+    constructor(type, position,scene) {
+        this.type = type;
+        this.position = position;
+        this.isActive = true;
+        this.scene = scene
+
+        // Create a visual representation for the power-up
+        const geometry = new THREE.SphereGeometry(1, 32, 32); // Sphere for power-up
+        const material = new THREE.MeshBasicMaterial({ color: this.getColor() });
+        this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh.position.copy(position);
+        scene.add(this.mesh);
+    }
+
+    // Determine color based on power-up type
+    getColor() {
+        switch (this.type) {
+            case powerUpTypes.ZOMBIE_SLOWDOWN:
+                return 0xff0000; // Red for zombie slowdown
+            case powerUpTypes.PLAYER_SPEEDUP:
+                return 0x00ff00; // Green for player speedup
+            case powerUpTypes.HEALTH_BOOST:
+                return 0x0000ff; // Blue for health boost
+            default:
+                return 0xffffff; // Default color
+        }
+    }
+
+    // Collect the power-up
+    
+
+    // Function to apply power-up effects
+applyPowerUpEffect(type) {
+    switch (type) {
+        case powerUpTypes.ZOMBIE_SLOWDOWN:
+            zombieSpeed *= 0.5; // Slow down zombies
+            console.log('Zombies slowed down!');
+            break;
+        case powerUpTypes.PLAYER_SPEEDUP:
+            moveSpeed *= 1.5; // Speed up player
+            console.log('Player speed increased!');
+            break;
+        case powerUpTypes.HEALTH_BOOST:
+            playerLife = Math.min(playerLife + 1, 5); // Heal player, max life is 5
+            console.log('Player health boosted!');
+            updateLifeBar()
+            break;
+        default:
+            break;
+    }
+}
+
+collect() {
+    this.isActive = false;
+    this.scene.remove(this.mesh); // Remove the mesh from the scene
+    this.applyPowerUpEffect(this.type); // Apply the power-up effect
+}
+
+}
+
+
 
 
 // Set up the scene, camera, and renderer
@@ -300,7 +375,6 @@ const createZombie = (skin, position) => {
             zombieData.Dying1 = mixer.clipAction(fb.animations[0]);
             zombieData.Dying1.loop = THREE.LoopOnce; // Set loop mode to LoopOnce
             zombieData.Dying1.clampWhenFinished = true; // Ensure the animation doesn't reset
-            console.log('Dying animation loaded:', zombieData.Dying1);
         });
         loader.load('/Zombie_Death.fbx', (fb) => {
             zombieData.Dying2 = mixer.clipAction(fb.animations[0]);
@@ -814,6 +888,8 @@ addZombies(controls.object.position);
      
 
 function addStructures() {
+   
+
     const structureCount = width * 0.01;
     const textureLoader = new THREE.TextureLoader();
     // Load texture maps
@@ -877,6 +953,12 @@ function addStructures() {
 
         // Create a group to hold all parts of the structure
         const structureGroup = new THREE.Group();
+
+        const powerUpType = Object.values(powerUpTypes)[Math.floor(Math.random() * Object.keys(powerUpTypes).length)];
+        const powerUp = new PowerUp(powerUpType, new THREE.Vector3(x, terrainHeight + height * 0.1, z), scene);
+        powerUps.push(powerUp);
+        
+
 
         // Create walls with more segments for better displacement
         const wallGeometry = new THREE.BoxGeometry(1, height, depth, 1, 50, 50);
@@ -968,6 +1050,28 @@ function addStructures() {
     }
 }
 
+function checkPowerUpCollection() {
+  
+    const player = controls.object.position;
+
+    for (let i = powerUps.length - 1; i >= 0; i--) {
+        const powerUp = powerUps[i];
+       
+
+        if (player.distanceTo(powerUp.position)<10 && powerUp.isActive) {
+            console.log('player speed before:'+moveSpeed + "\n"+ 'zombiespeed before :'+zombieSpeed + "\n"+'player health before:'+playerLife)
+
+            
+            powerUp.collect(moveSpeed,zombieSpeed,playerLife); // Collect the power-up
+            powerUps.splice(i, 1); // Remove from the active list
+            updateLifeBar(); // Update the life bar
+
+            console.log('powerup activated!!:'+powerUp.type)
+            console.log('player speed after:'+moveSpeed + "\n"+ 'zombiespeed after:'+zombieSpeed + "\n"+'player health after:'+playerLife)
+        }
+    }
+}
+
 
 
 function getRandomAction(zombie, actions) {
@@ -1053,7 +1157,6 @@ function handleZombies(delta) {
         fbx.lookAt(cameraPosition);
 
         const distanceToCamera = zombiePosition.distanceTo(cameraPosition);
-        console.log(distanceToCamera);
 
         // Handle zombie death
         if (!zombie.isDead && isShiftPressed) {
@@ -1141,7 +1244,7 @@ function handleZombies(delta) {
         const onKeyDown = function (event) {
             switch (event.code) {
                 case 'ShiftLeft':
-                    console.log("Shift is being pressed")
+            
                     isShiftPressed = true;
                     break;
                 case 'KeyW':
@@ -1229,7 +1332,7 @@ function handleZombies(delta) {
 
                
 
-                const moveSpeed = 20;
+                
                 const velocity = new THREE.Vector3();
 
                 if (moveForward) velocity.z += moveSpeed * delta;
@@ -1300,6 +1403,7 @@ function handleZombies(delta) {
                 updateSkyColor();
 
                 updateMinimap();
+                checkPowerUpCollection();
               
 
             renderer.render(scene, camera);
@@ -1311,6 +1415,7 @@ function handleZombies(delta) {
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
+
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
  
