@@ -27,9 +27,37 @@ let kills = 0;
 let currentLevel = 1;
 let isGameOver = false;
 let gameOverScreen;
+let isPaused = false; // Game pause state
+const pauseSign = document.getElementById('pauseSign');
+const playSign = document.getElementById('playSign');
+
 
 const powerUps = []; // Array to store active power-ups
 
+
+function pauseGame() {
+    isPaused = true; // Set the pause state to true
+    pauseSign.style.display = 'block'; // Show the pause sign
+        playSign.style.display = 'none'; // Hide the play sign
+        clock.stop(); // Stop the clock when paused
+    console.log('Game Paused');
+    // Optionally, display a pause menu or overlay here
+}
+
+// Function to resume the game
+function resumeGame() {
+    isPaused = false; // Set the pause state to false
+    console.log('Game Resumed');
+    pauseSign.style.display = 'none'; // Hide the pause sign
+        playSign.style.display = 'block'; // Show the play sign
+        clock.start(); // Resume the clock
+        
+        // Hide the play sign after 1 second
+        setTimeout(() => {
+            playSign.style.display = 'none'; // Hide the play sign after 1 second
+        }, 1000);
+    animate(); // Restart the render loop
+}
 
 
 const powerUpTypes = {
@@ -1289,9 +1317,17 @@ function handleZombies(delta) {
         const onKeyDown = function (event) {
             switch (event.code) {
                 case 'ShiftLeft':
-            
                     isShiftPressed = true;
                     break;
+            
+                case 'KeyP':
+                    if (isPaused) {
+                        resumeGame();
+                    } else {
+                        pauseGame();
+                    }
+                    break;
+
                 case 'KeyW':
                     moveForward = true;
                     break;
@@ -1363,95 +1399,97 @@ function handleZombies(delta) {
         const clock = new THREE.Clock();
         function animate() {
             const delta = clock.getDelta();
-            if (!isGameOver) {
+            if (!isGameOver&&!isPaused) {
                 handleZombies(delta);
                 // ... (rest of your animate function)
             }
             
             checkGameOver();
             
-           
-            requestAnimationFrame(animate);
+            if (!isPaused) {
 
-            if (controls.isLocked === true) {
+                requestAnimationFrame(animate);
 
-               
+                if (controls.isLocked === true) {
 
                 
-                const velocity = new THREE.Vector3();
 
-                if (moveForward) velocity.z += moveSpeed * delta;
-                if (moveBackward) velocity.z -= moveSpeed * delta;
-                if (moveLeft) velocity.x -= moveSpeed * delta;
-                if (moveRight) velocity.x += moveSpeed * delta;
+                    
+                    const velocity = new THREE.Vector3();
 
-                controls.moveRight(velocity.x);
-                controls.moveForward(velocity.z);
+                    if (moveForward) velocity.z += moveSpeed * delta;
+                    if (moveBackward) velocity.z -= moveSpeed * delta;
+                    if (moveLeft) velocity.x -= moveSpeed * delta;
+                    if (moveRight) velocity.x += moveSpeed * delta;
 
-                // Apply gravity
-                velocityY += gravity * delta;
-                const playerPos = controls.object.position.clone();
+                    controls.moveRight(velocity.x);
+                    controls.moveForward(velocity.z);
 
-                // Calculate the new position
-                const newPosition = playerPos.clone();
-                newPosition.x += velocity.x;
-                newPosition.z += velocity.z;
-                newPosition.y += velocityY * delta;
+                    // Apply gravity
+                    velocityY += gravity * delta;
+                    const playerPos = controls.object.position.clone();
 
-                // Get terrain height at the new position
-                const terrainHeight = getTerrainHeight(
-                    newPosition.x, newPosition.z, 
-                    terrainGeometry, width, length, 128
-                );
-      
+                    // Calculate the new position
+                    const newPosition = playerPos.clone();
+                    newPosition.x += velocity.x;
+                    newPosition.z += velocity.z;
+                    newPosition.y += velocityY * delta;
+
+                    // Get terrain height at the new position
+                    const terrainHeight = getTerrainHeight(
+                        newPosition.x, newPosition.z, 
+                        terrainGeometry, width, length, 128
+                    );
+        
+                    
                 
-              
 
-                // Check for collisions with the ground
-                if (newPosition.y < terrainHeight+4) {
-                    velocityY = 0;
-                    newPosition.y = terrainHeight+4;
-                    isOnGround = true;
-                }
-
-                // Update player bounding box position based on camera
-                const playerPosition = controls.object.position;
-                playerBoundingBox.min.set(
-                    playerPosition.x - 0.5,
-                    playerPosition.y - 2,
-                    playerPosition.z - 0.5
-                );
-                playerBoundingBox.max.set(
-                    playerPosition.x + 0.5,
-                    playerPosition.y,
-                    playerPosition.z + 0.5
-                );
-
-                // Collision detection: Prevent moving into obstacles
-                obstacles.forEach(obstacle => {
-                    if (playerBoundingBox.intersectsBox(obstacle.boundingBox)) {
-                        // If colliding, stop movement
-                        controls.moveRight(-velocity.x);
-                        controls.moveForward(-velocity.z);
+                    // Check for collisions with the ground
+                    if (newPosition.y < terrainHeight+4) {
+                        velocityY = 0;
+                        newPosition.y = terrainHeight+4;
+                        isOnGround = true;
                     }
-                });
 
-                // Keep the player within the arena bounds
-                playerPosition.x = Math.max(-width/2-1, Math.min(width/2-1, playerPosition.x));
-                playerPosition.z = Math.max(-width/2-1, Math.min(width/2-1, playerPosition.z));
-                playerPosition.y = Math.max(playerPosition.y, terrainHeight + 4);
+                    // Update player bounding box position based on camera
+                    const playerPosition = controls.object.position;
+                    playerBoundingBox.min.set(
+                        playerPosition.x - 0.5,
+                        playerPosition.y - 2,
+                        playerPosition.z - 0.5
+                    );
+                    playerBoundingBox.max.set(
+                        playerPosition.x + 0.5,
+                        playerPosition.y,
+                        playerPosition.z + 0.5
+                    );
 
+                    // Collision detection: Prevent moving into obstacles
+                    obstacles.forEach(obstacle => {
+                        if (playerBoundingBox.intersectsBox(obstacle.boundingBox)) {
+                            // If colliding, stop movement
+                            controls.moveRight(-velocity.x);
+                            controls.moveForward(-velocity.z);
+                        }
+                    });
+
+                    // Keep the player within the arena bounds
+                    playerPosition.x = Math.max(-width/2-1, Math.min(width/2-1, playerPosition.x));
+                    playerPosition.z = Math.max(-width/2-1, Math.min(width/2-1, playerPosition.z));
+                    playerPosition.y = Math.max(playerPosition.y, terrainHeight + 4);
+
+                }
+                
+                    animateSun();
+                    animateMoon();
+                    updateSkyColor();
+
+                    updateMinimap();
+                    checkPowerUpCollection();
+                
+
+                renderer.render(scene, camera);
             }
-            
-                animateSun();
-                animateMoon();
-                updateSkyColor();
-
-                updateMinimap();
-                checkPowerUpCollection();
-              
-
-            renderer.render(scene, camera);
            
         }
         animate();
