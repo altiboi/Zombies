@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import {PointerLockControls} from 'three/examples/jsm/controls/PointerLockControls.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js';
+import * as CANNON from 'cannon';
 
 
 // Loading Manager to track progress
@@ -43,8 +46,33 @@ const zombies = [];
 const obstacles = [];
 const loader = new FBXLoader(loadingManager); 
 const controls = new PointerLockControls(camera, document.body);
+scene.add(controls.object);
 
+// Initialize Cannon.js physics world
+let world = new CANNON.World();
+world.gravity.set(0, -9.8, 0);
+world.broadphase = new CANNON.NaiveBroadphase();
+world.solver.iterations = 10;
 
+const bodyMeshMap = new Map();
+
+// Create a player body
+const characterShape = new CANNON.Sphere(0.5); // Example shape
+const characterBody = new CANNON.Body({ mass: 1 });
+characterBody.position.set(0, 100, 0.5);
+characterBody.addShape(characterShape);
+world.addBody(characterBody);
+
+characterBody.addEventListener('collide', (event) => {
+    const contact = event.contact;
+    const otherBody = event.body; // The other body involved in the collision
+    if(otherBody !== worldTerrain)
+    {
+        console.log('Player collided with:', otherBody);
+    console.log('Contact point:', contact.ri);
+    console.log('Contact normal:', contact.ni);
+    }
+});
 
 //MINIMAP SECTION
 const minimapCanvas = document.createElement('canvas');
@@ -279,6 +307,14 @@ const createZombie = (skin, position) => {
         const mixer = new THREE.AnimationMixer(fbx);
         const zombieData = { fbx, mixer, actionChosen: false, chosenAction: null, isDead: false, life: 10 }; // Set life to 5
 
+        // Create a physics body for the zombie
+        const zombieShape = new CANNON.Box(new CANNON.Vec3(1, 1, 1)); // Adjust size as needed
+        const zombieBody = new CANNON.Body({ mass: 1 });
+        zombieBody.addShape(zombieShape);
+        zombieBody.position.copy(position);
+        world.addBody(zombieBody);
+        zombieData.body = zombieBody;
+
         // Load animations
         loader.load('/Running.fbx', (fb) => {
             zombieData.runAction = mixer.clipAction(fb.animations[0]);
@@ -314,8 +350,7 @@ const createZombie = (skin, position) => {
         });
     });
 };
-
-           
+    
 
 function createWall(terrainGeometry) {
     const textureLoader = new THREE.TextureLoader();
@@ -324,10 +359,8 @@ function createWall(terrainGeometry) {
     const wallBumpMap = textureLoader.load('wallbumpmap.jpg');
 
     // Configure the bump map so it doesn't tile too many times
-      // Configure the bump map to repeat
-      wallBumpMap.wrapS = wallBumpMap.wrapT = THREE.RepeatWrapping;
+    wallBumpMap.wrapS = wallBumpMap.wrapT = THREE.RepeatWrapping;
     wallBumpMap.repeat.set(1, 1); // Adjust this value to maintain the original aspect ratio
-
 
     // Helper function to get terrain height at specific coordinates
     function getTerrainHeight(x, z, terrainGeometry, terrainWidth, terrainLength, resolution) {
@@ -355,41 +388,44 @@ function createWall(terrainGeometry) {
         shininess: 10     // Adjust for desired shininess
     });
 
+    // Function to create a wall and add it to the scene and physics world
+    function createWallMeshAndBody(position, rotation = 0) {
+        const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
+        wallMesh.position.copy(position);
+        wallMesh.rotation.y = rotation;
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        scene.add(wallMesh);
+
+        const wallShape = new CANNON.Box(new CANNON.Vec3(0.5, 15, 0.5)); // Adjust size as needed
+        const wallBody = new CANNON.Body({ mass: 0 }); // Static body
+        wallBody.addShape(wallShape);
+        wallBody.position.copy(position);
+        wallBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), rotation);
+        world.addBody(wallBody);
+
+        // Map the body to the mesh
+        bodyMeshMap.set(wallBody, wallMesh);
+    }
+
     // Create front wall
-    const frontWall = new THREE.Mesh(wallGeometry, wallMaterial);
     const frontWallHeight = getTerrainHeight(0, -width / 2, terrainGeometry, width, length, 128); // Adjust based on resolution
-    frontWall.position.set(0, frontWallHeight + 10, -width / 2);
-    frontWall.castShadow = true;
-    frontWall.receiveShadow = true;
-    scene.add(frontWall);
+    createWallMeshAndBody(new THREE.Vector3(0, frontWallHeight + 10, -width / 2));
 
     // Create back wall
-    const backWall = new THREE.Mesh(wallGeometry, wallMaterial);
     const backWallHeight = getTerrainHeight(0, width / 2, terrainGeometry, width, length, 128);
-    backWall.position.set(0, backWallHeight + 10, width / 2);
-    backWall.castShadow = true;
-    backWall.receiveShadow = true;
-    scene.add(backWall);
+    createWallMeshAndBody(new THREE.Vector3(0, backWallHeight + 10, width / 2));
 
     // Create left wall
-    const leftWall = new THREE.Mesh(wallGeometry, wallMaterial);
     const leftWallHeight = getTerrainHeight(-width / 2, 0, terrainGeometry, width, length, 128);
-    leftWall.rotation.y = Math.PI / 2;
-    leftWall.position.set(-width / 2, leftWallHeight + 10, 0);
-    leftWall.castShadow = true;
-    leftWall.receiveShadow = true;
-    scene.add(leftWall);
+    createWallMeshAndBody(new THREE.Vector3(-width / 2, leftWallHeight + 10, 0), Math.PI / 2);
 
     // Create right wall
-    const rightWall = new THREE.Mesh(wallGeometry, wallMaterial);
     const rightWallHeight = getTerrainHeight(width / 2, 0, terrainGeometry, width, length, 128);
-    rightWall.rotation.y = Math.PI / 2;
-    rightWall.position.set(width / 2, rightWallHeight + 10, 0);
-    rightWall.castShadow = true;
-    rightWall.receiveShadow = true;
-    scene.add(rightWall);
+    createWallMeshAndBody(new THREE.Vector3(width / 2, rightWallHeight + 10, 0), Math.PI / 2);
 }
 
+let worldTerrain;
 function createTerrain() {
     const terrainWidth = width;
     const terrainLength = length;
@@ -428,7 +464,7 @@ function createTerrain() {
             const vertices = terrainGeometry.attributes.position.array;
             for (let i = 0, j = 0, l = vertices.length; i < l; i++, j += 3) {
                 const heightValue = imageData.data[i * 4]; // Assuming grayscale image, use only the red channel
-                vertices[j + 2] = 0; // Adjust the division factor to control the terrain height, i made it 0 to make the terrain flat for now
+                vertices[j + 2] = heightValue / 255 * 10; // Adjust the division factor to control the terrain height
             }
 
             // Update normals to account for the new vertex positions
@@ -448,31 +484,54 @@ function createTerrain() {
             // Add the terrain to the scene
             scene.add(terrain);
 
+            // Extract vertices and indices from the terrain geometry
+            const cannonVertices = [];
+            const cannonIndices = [];
+            for (let i = 0; i < vertices.length; i += 3) {
+                cannonVertices.push(vertices[i], vertices[i + 1], vertices[i + 2]);
+            }
+            for (let i = 0; i < terrainGeometry.index.array.length; i += 3) {
+                cannonIndices.push(
+                    terrainGeometry.index.array[i],
+                    terrainGeometry.index.array[i + 1],
+                    terrainGeometry.index.array[i + 2]
+                );
+            }
+
+            // Create the Trimesh shape for Cannon.js
+            const terrainShape = new CANNON.Trimesh(cannonVertices, cannonIndices);
+
+            // Create the terrain body for Cannon.js
+            const terrainBody = new CANNON.Body({ mass: 0 }); // Mass = 0 for static ground
+            terrainBody.addShape(terrainShape);
+            
+            // Set the position and rotation to match the Three.js terrain
+            terrainBody.position.set(0, 0, 0);
+            terrainBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+
+            // Add the terrain body to the world
+            world.addBody(terrainBody);
+            worldTerrain = terrainBody;
             // Optionally, create walls around the terrain
             createWall(terrainGeometry);
             addStructures();
-             // Set up controls
-
-     
- 
- 
         });
     });
 }
 
 function getTerrainHeight(x, z, terrainGeometry, terrainWidth, terrainLength, resolution) {
-        const vertices = terrainGeometry.attributes.position.array;
+    const vertices = terrainGeometry.attributes.position.array;
 
-        // Convert x, z into the corresponding index on the heightmap grid
-        const xIndex = Math.floor((x + terrainWidth / 2) / terrainWidth * (resolution - 1));
-        const zIndex = Math.floor((z + terrainLength / 2) / terrainLength * (resolution - 1));
+    // Convert x, z into the corresponding index on the heightmap grid
+    const xIndex = Math.floor((x + terrainWidth / 2) / terrainWidth * (resolution - 1));
+    const zIndex = Math.floor((z + terrainLength / 2) / terrainLength * (resolution - 1));
 
-        // Find the corresponding vertex in the geometry
-        const vertexIndex = (zIndex * resolution + xIndex) * 3; // Each vertex has 3 components (x, y, z)
-        const terrainHeight = vertices[vertexIndex + 2]; // The height is the Z component in the plane geometry
+    // Find the corresponding vertex in the geometry
+    const vertexIndex = (zIndex * resolution + xIndex) * 3; // Each vertex has 3 components (x, y, z)
+    const terrainHeight = vertices[vertexIndex + 2]; // The height is the Z component in the plane geometry
 
-        return terrainHeight;
- }
+    return terrainHeight;
+}
 
 
     function addSun() {
@@ -680,8 +739,6 @@ function addTrees() {
         const trunkMaterial = new THREE.MeshPhongMaterial({
             color: 0x8B4513,
             bumpMap: barkBumpMap,
-            
-
             bumpScale: 0.7
         });
         const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
@@ -743,6 +800,16 @@ function addTrees() {
 
         // Add tree as an obstacle (bounding box)
         obstacles.push({ mesh: trunk, boundingBox: treeBoundingBox });
+
+        // Create a physics body for the tree trunk
+        const trunkShape = new CANNON.Cylinder(trunkRadius, trunkRadius * 1.2, trunkHeight, 8);
+        const trunkBody = new CANNON.Body({ mass: 0 }); // Static body
+        trunkBody.addShape(trunkShape);
+        trunkBody.position.set(x, trunkHeight / 2, z);
+        world.addBody(trunkBody);
+
+        // Map the body to the mesh
+        bodyMeshMap.set(trunkBody, trunk);
     }
 }
 
@@ -772,8 +839,8 @@ function addStructures() {
         metalness: 0.8
     });
 
-        // Ensure that openingHeight and openingWidth are defined
-        const openingHeight = 25; // Example value, adjust as needed
+    // Ensure that openingHeight and openingWidth are defined
+    const openingHeight = 25; // Example value, adjust as needed
     const openingWidth = 15;  // Example value, adjust as needed
 
     function isSpaceClear(x, z, structureWidth, depth) {
@@ -834,24 +901,20 @@ function addStructures() {
         backWall.position.set(0, height / 2, -depth / 2 + 0.5);
         structureGroup.add(backWall);
 
-         // Front wall (with opening)
-         const frontWallTopGeometry = new THREE.BoxGeometry(structureWidth, height - openingHeight, 1, 50, 25, 1);
+        // Front wall (with opening)
+        const frontWallTopGeometry = new THREE.BoxGeometry(structureWidth, height - openingHeight, 1, 50, 25, 1);
         const frontWallTop = new THREE.Mesh(frontWallTopGeometry, brickMaterial);
-        frontWallTop.position.set(0, height/2 + openingHeight/2, depth/2 - 0.5);
+        frontWallTop.position.set(0, height / 2 + openingHeight / 2, depth / 2 - 0.5);
         structureGroup.add(frontWallTop);
-        
-      
 
-        const frontWallSideGeometry = new THREE.BoxGeometry((structureWidth - openingWidth)/2, openingHeight, 1, 25, 25, 1);
+        const frontWallSideGeometry = new THREE.BoxGeometry((structureWidth - openingWidth) / 2, openingHeight, 1, 25, 25, 1);
         const frontWallLeft = new THREE.Mesh(frontWallSideGeometry, brickMaterial);
-        frontWallLeft.position.set(-structureWidth/4 - openingWidth/4, openingHeight/2, depth/2 - 0.5);
+        frontWallLeft.position.set(-structureWidth / 4 - openingWidth / 4, openingHeight / 2, depth / 2 - 0.5);
         structureGroup.add(frontWallLeft);
 
         const frontWallRight = new THREE.Mesh(frontWallSideGeometry, brickMaterial);
-        frontWallRight.position.set(structureWidth/4 + openingWidth/4, openingHeight/2, depth/2 - 0.5);
+        frontWallRight.position.set(structureWidth / 4 + openingWidth / 4, openingHeight / 2, depth / 2 - 0.5);
         structureGroup.add(frontWallRight);
-
-        
 
         // Roof
         const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.7, metalness: 0.2 });
@@ -861,7 +924,7 @@ function addStructures() {
         structureGroup.add(roof);
 
         // Position the entire structure
-        structureGroup.position.set(x, terrainHeight - 1, z);
+        structureGroup.position.set(x, terrainHeight, z);
 
         // Add shadows
         structureGroup.traverse((object) => {
@@ -873,29 +936,58 @@ function addStructures() {
 
         scene.add(structureGroup);
 
-        // Create bounding boxes for each wall to use as obstacles
-        const wallThickness = 3;
-        const localobstacles = [
-            new THREE.Box3().setFromObject(new THREE.Mesh(new THREE.BoxGeometry(wallThickness, height, depth))),
-            new THREE.Box3().setFromObject(new THREE.Mesh(new THREE.BoxGeometry(wallThickness, height, depth))),
-            new THREE.Box3().setFromObject(new THREE.Mesh(new THREE.BoxGeometry(structureWidth, height, wallThickness))),
-                // Front wall top
-                new THREE.Box3().setFromObject(new THREE.Mesh(new THREE.BoxGeometry(structureWidth, height - openingHeight, wallThickness))),
-            // Front wall left
-            new THREE.Box3().setFromObject(new THREE.Mesh(new THREE.BoxGeometry((structureWidth - openingWidth)/2, openingHeight, wallThickness))),
-            // Front wall right
-            new THREE.Box3().setFromObject(new THREE.Mesh(new THREE.BoxGeometry((structureWidth - openingWidth)/2, openingHeight, wallThickness))),
-            new THREE.Box3().setFromObject(new THREE.Mesh(new THREE.BoxGeometry(structureWidth, height - 10, wallThickness)))
-        ];
+        // Create physics bodies for each wall
+        const wallThickness = 1;
+        const leftWallShape = new CANNON.Box(new CANNON.Vec3(wallThickness / 2, height / 2, depth / 2));
+        const rightWallShape = new CANNON.Box(new CANNON.Vec3(wallThickness / 2, height / 2, depth / 2));
+        const backWallShape = new CANNON.Box(new CANNON.Vec3(structureWidth / 2, height / 2, wallThickness / 2));
+        const frontWallTopShape = new CANNON.Box(new CANNON.Vec3(structureWidth / 2, (height - openingHeight) / 2, wallThickness / 2));
+        const frontWallSideShape = new CANNON.Box(new CANNON.Vec3((structureWidth - openingWidth) / 4, openingHeight / 2, wallThickness / 2));
+        const roofShape = new CANNON.Box(new CANNON.Vec3(structureWidth / 2, 0.5, depth / 2));
 
-        localobstacles[0].translate(new THREE.Vector3(x - structureWidth / 2 + wallThickness / 2, height / 2, z));
-        localobstacles[1].translate(new THREE.Vector3(x + structureWidth / 2 - wallThickness / 2, height / 2, z));
-        localobstacles[2].translate(new THREE.Vector3(x, height / 2, z - depth / 2 + wallThickness / 2));
-        localobstacles[3].translate(new THREE.Vector3(x, height / 2 + 10 / 2, z + depth / 2 - wallThickness / 2));
+        const leftWallBody = new CANNON.Body({ mass: 0 });
+        leftWallBody.addShape(leftWallShape);
+        leftWallBody.position.set(x - structureWidth / 2 + wallThickness / 2, terrainHeight + height / 2, z);
+        world.addBody(leftWallBody);
 
-        localobstacles.forEach(box => {
-            obstacles.push({ boundingBox: box });
-        });
+        const rightWallBody = new CANNON.Body({ mass: 0 });
+        rightWallBody.addShape(rightWallShape);
+        rightWallBody.position.set(x + structureWidth / 2 - wallThickness / 2, terrainHeight + height / 2, z);
+        world.addBody(rightWallBody);
+
+        const backWallBody = new CANNON.Body({ mass: 0 });
+        backWallBody.addShape(backWallShape);
+        backWallBody.position.set(x, terrainHeight + height / 2, z - depth / 2 + wallThickness / 2);
+        world.addBody(backWallBody);
+
+        const frontWallTopBody = new CANNON.Body({ mass: 0 });
+        frontWallTopBody.addShape(frontWallTopShape);
+        frontWallTopBody.position.set(x, terrainHeight + height / 2 + openingHeight / 2, z + depth / 2 - wallThickness / 2);
+        world.addBody(frontWallTopBody);
+
+        const frontWallLeftBody = new CANNON.Body({ mass: 0 });
+        frontWallLeftBody.addShape(frontWallSideShape);
+        frontWallLeftBody.position.set(x - structureWidth / 4 - openingWidth / 4, terrainHeight + openingHeight / 2, z + depth / 2 - wallThickness / 2);
+        world.addBody(frontWallLeftBody);
+
+        const frontWallRightBody = new CANNON.Body({ mass: 0 });
+        frontWallRightBody.addShape(frontWallSideShape);
+        frontWallRightBody.position.set(x + structureWidth / 4 + openingWidth / 4, terrainHeight + openingHeight / 2, z + depth / 2 - wallThickness / 2);
+        world.addBody(frontWallRightBody);
+
+        const roofBody = new CANNON.Body({ mass: 0 });
+        roofBody.addShape(roofShape);
+        roofBody.position.set(x, terrainHeight + height - 0.5, z);
+        world.addBody(roofBody);
+
+        // Map the bodies to the meshes
+        bodyMeshMap.set(leftWallBody, leftWall);
+        bodyMeshMap.set(rightWallBody, rightWall);
+        bodyMeshMap.set(backWallBody, backWall);
+        bodyMeshMap.set(frontWallTopBody, frontWallTop);
+        bodyMeshMap.set(frontWallLeftBody, frontWallLeft);
+        bodyMeshMap.set(frontWallRightBody, frontWallRight);
+        bodyMeshMap.set(roofBody, roof);
 
         placedStructures++;
     }
@@ -990,7 +1082,7 @@ function handleZombies(delta) {
         fbx.lookAt(cameraPosition);
 
         const distanceToCamera = zombiePosition.distanceTo(cameraPosition);
-        console.log(distanceToCamera);
+        //console.log(distanceToCamera);
 
         // Handle zombie death
         if (!zombie.isDead && isShiftPressed) {
@@ -1062,6 +1154,304 @@ function handleZombies(delta) {
     });
 }
 
+function genRandomColor() {
+    const r = Math.floor(Math.random() * 256);
+    const g = Math.floor(Math.random() * 256);
+    const b = Math.floor(Math.random() * 256);
+    return `rgb(${r},${g},${b})`;
+}
+
+const paintballs = [];
+const paintballsToRemove = [];
+
+const splatTextures = [
+    new THREE.TextureLoader().load('./assets/splatter-test1.png'),
+    new THREE.TextureLoader().load('./assets/splatter-test2.png'),
+    new THREE.TextureLoader().load('./assets/splatter-test1.png'),
+    new THREE.TextureLoader().load('./assets/splatter-test2.png'),
+];
+
+splatTextures.forEach((texture) => {
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearMipMapLinearFilter;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.anisotropy = 16;
+});
+
+// Function to create a splat on collision
+function createSplat(intersectedObject, position, normal, color) {
+    const size = new THREE.Vector3(0.85, 0.85, 0.85);
+    const index = Math.floor(Math.random() * splatTextures.length);
+    const texture = splatTextures[index];
+    const splatMaterial = new THREE.MeshBasicMaterial({
+        map: texture,
+        color: color,
+        transparent: true,
+        depthWrite: false,
+        depthTest: true,
+        polygonOffset: true,
+        polygonOffsetFactor: -4,
+        side: THREE.DoubleSide,
+    });
+
+    normal.normalize();
+
+    // Offset the position slightly along the normal
+    const offset = normal.clone().multiplyScalar(0.01);
+    const splatPosition = position.clone().add(offset);
+
+    const splatGeometry = new DecalGeometry(intersectedObject, splatPosition, normal, size);
+    const splat = new THREE.Mesh(splatGeometry, splatMaterial);
+    splat.renderOrder = 1;
+
+    // Add splat to the scene
+    scene.add(splat);
+}
+
+// Function to update the score
+function updateScore() {
+    const scoreElement = document.getElementById('score');
+    scoreElement.innerText = `Score: ${score}`;
+    console.log('Score:', score);
+}
+
+// Load the gun model
+let gun;
+const GLTFloader = new GLTFLoader();
+GLTFloader.load('./submachine_gun.glb', function(gltf) {
+    gun = gltf.scene;
+    renderer.shadowMap.enabled = true;
+    //directionalLight.castShadow = true;
+    gun.traverse((child) => {
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+        }
+    });
+    gun.scale.set(0.01, 0.01, 0.01);  // Scale the gun to fit the player's hand
+    gun.position.set(0.2, -0.1, -0.075); // Position relative to the player's view (adjust as needed)
+    gun.rotation.set(0, Math.PI / 2, 0);
+    gun.renderOrder = 2;
+    camera.add(gun);  // Add the gun to the player's camera so it follows the view
+    console.log("Gun loaded successfully:", gun);
+
+}, undefined, function(error) {
+    console.error("Error loading gun:", error);
+});
+
+// Function to apply recoil effect
+function applyRecoil() {
+    const recoilDistance = 0.05; // Adjust the recoil distance as needed
+    const recoilRotation = 0.1; // Adjust the recoil rotation as needed
+
+    // Apply recoil
+    gun.position.z += recoilDistance;
+    gun.rotation.x += recoilRotation;
+
+    // Gradually return the gun to its original position and rotation
+    // Gradually return the gun to its original position and rotation using GSAP
+    gsap.to(gun.position, { z: gun.position.z - recoilDistance, duration: 0.25 });
+    gsap.to(gun.rotation, { x: gun.rotation.x - recoilRotation, duration: 0.25 });
+}
+
+// Function to create a spark effect
+function createSpark(position) {
+    const sparkGeometry = new THREE.BufferGeometry();
+    const sparkMaterial = new THREE.PointsMaterial({ color: 0xffa500, size: 0.1 });
+
+    const sparkCount = 10;
+    const positions = new Float32Array(sparkCount * 3);
+
+    for (let i = 0; i < sparkCount; i++) {
+        positions[i * 3] = position.x + (Math.random() - 0.5) * 0.2;
+        positions[i * 3 + 1] = position.y + (Math.random() - 0.5) * 0.2;
+        positions[i * 3 + 2] = position.z + (Math.random() - 0.5) * 0.2;
+    }
+
+    sparkGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const sparks = new THREE.Points(sparkGeometry, sparkMaterial);
+    scene.add(sparks);
+
+    // Remove sparks after a short duration
+    setTimeout(() => {
+        scene.remove(sparks);
+    }, 100);
+}
+
+// Function to create a bullet trail
+function createBulletTrail(paintballMesh) {
+    const trailMaterial = new THREE.LineBasicMaterial({ color: 0xffa500 });
+    const trailGeometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(6); // Two points (start and end) with 3 coordinates each
+
+    trailGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const trail = new THREE.Line(trailGeometry, trailMaterial);
+
+    scene.add(trail);
+
+    return trail;
+}
+
+// Shooting logic with a max of 50 paintballs
+function shootPaintball() {
+    if (paintballs.length >= 50) {
+        const oldestPaintball = paintballs.shift();
+        world.removeBody(oldestPaintball.body);
+        scene.remove(oldestPaintball.mesh);
+        scene.remove(oldestPaintball.trail);
+    }
+
+    const paintballShape = new CANNON.Sphere(0.02);
+    const paintballBody = new CANNON.Body({ mass: 0.01 });
+    paintballBody.addShape(paintballShape);
+
+    // Get the gun barrel position
+    const gunBarrelPosition = new THREE.Vector3();
+    gun.getWorldPosition(gunBarrelPosition);
+
+    const direction = new THREE.Vector3();
+    camera.getWorldDirection(direction);
+    direction.normalize();
+
+    // Offset the paintball's initial position slightly forward along the shooting direction
+    const offset = direction.clone().multiplyScalar(0.75); // Adjust the scalar value as needed
+
+    paintballBody.position.set(
+        gunBarrelPosition.x + offset.x,
+        gunBarrelPosition.y + offset.y,
+        gunBarrelPosition.z + offset.z
+    );
+
+    paintballBody.velocity.set(
+        direction.x * 100,
+        direction.y * 100,
+        direction.z * 100
+    );
+
+    world.addBody(paintballBody);
+
+    const paintballGeometry = new THREE.SphereGeometry(0.02, 32, 32);
+    const paintballMaterial = new THREE.MeshStandardMaterial({ color: genRandomColor() });
+    const paintballMesh = new THREE.Mesh(paintballGeometry, paintballMaterial);
+    paintballMesh.position.copy(paintballBody.position);
+    scene.add(paintballMesh);
+
+    // Create bullet trail
+    const trail = createBulletTrail(paintballMesh);
+
+    paintballs.push({ body: paintballBody, mesh: paintballMesh, trail: trail });
+
+    createSpark(paintballBody.position);
+    applyRecoil();
+
+   // Add collision event listener
+   paintballBody.addEventListener('collide', (event) => {
+        const collidedWith = event.body; // The body the paintball collided with
+        console.log('Paintball collided with:', collidedWith);
+
+        // Get the corresponding THREE.Mesh object
+        const intersectedObject = bodyMeshMap.get(collidedWith);
+
+        if (intersectedObject) {
+            // Add a mark at the collision point
+            const contact = event.contact;
+            const collisionPoint = new THREE.Vector3().copy(contact.rj).applyQuaternion(collidedWith.quaternion);
+            const collisionNormal = new THREE.Vector3().copy(contact.ni);
+            createSplat(intersectedObject, collisionPoint, collisionNormal, paintballMesh.material.color);
+        }
+
+        // Mark paintball for removal on collision
+        paintballsToRemove.push({ body: paintballBody, mesh: paintballMesh });
+    });
+}
+
+document.addEventListener('mousedown', shootPaintball);
+
+// Update loop
+function updatePhysics(deltaTime) {
+    world.step(deltaTime);
+
+    // Apply movement
+    const velocity = characterBody.velocity;
+    velocity.x = 0;
+    velocity.z = 0;
+
+    const speed = 10;
+
+    const direction = new THREE.Vector3();
+    controls.getDirection(direction);
+
+    if (moveForward) {
+        velocity.x += direction.x * speed;
+        velocity.z += direction.z * speed;
+    }
+    if (moveBackward) {
+        velocity.x -= direction.x * speed;
+        velocity.z -= direction.z * speed;
+    }
+    if (moveLeft) {
+        velocity.x += direction.z * speed;
+        velocity.z -= direction.x * speed;
+    }
+    if (moveRight) {
+        velocity.x -= direction.z * speed;
+        velocity.z += direction.x * speed;
+    }
+
+    // Update camera position
+    camera.position.copy(characterBody.position);
+
+    // Check if character is on the ground
+    if (characterBody.position.y <= 0.5) {
+        isOnGround = true;
+    }
+
+    // Update zombies' positions
+    zombies.forEach(zombie => {
+        if (zombie.body) {
+            zombie.fbx.position.copy(zombie.body.position);
+            zombie.fbx.quaternion.copy(zombie.body.quaternion);
+
+            // // Example: Simple AI for zombie movement towards the player
+            // const zombieVelocity = zombie.body.velocity;
+            // const toPlayer = new THREE.Vector3().subVectors(characterBody.position, zombie.body.position);
+            // toPlayer.normalize();
+            // const zombieSpeed = 5; // Adjust speed as needed
+            // zombieVelocity.x = toPlayer.x * zombieSpeed;
+            // zombieVelocity.z = toPlayer.z * zombieSpeed;
+        }
+    });
+
+    // Update paintball positions and trails
+    paintballs.forEach(paintball => {
+        paintball.mesh.position.copy(paintball.body.position);
+
+        // // Update trail
+        // const positions = paintball.trail.geometry.attributes.position.array;
+        // positions[0] = paintball.body.previousPosition.x;
+        // positions[1] = paintball.body.previousPosition.y;
+        // positions[2] = paintball.body.previousPosition.z;
+        // positions[3] = paintball.body.position.x;
+        // positions[4] = paintball.body.position.y;
+        // positions[5] = paintball.body.position.z;
+        // paintball.trail.geometry.attributes.position.needsUpdate = true;
+    });
+
+    // Remove paintballs marked for removal
+    paintballsToRemove.forEach(paintball => {
+        world.removeBody(paintball.body);
+        scene.remove(paintball.mesh);
+        scene.remove(paintball.trail);
+        const index = paintballs.indexOf(paintball);
+        if (index > -1) {
+            paintballs.splice(index, 1);
+        }
+    });
+    paintballsToRemove.length = 0; // Clear the array
+}
+
 
        
         let moveForward = false;
@@ -1071,7 +1461,7 @@ function handleZombies(delta) {
         let canJump = false;
         let velocityY = 0;
         const gravity = -9.8;
-        const jumpHeight = 5;
+        const jumpHeight = 15;
         let isOnGround = true;
         let isShiftPressed = false;
 
@@ -1095,7 +1485,7 @@ function handleZombies(delta) {
                     break;
                 case 'Space':
                     if (isOnGround) {
-                        velocityY = jumpHeight;
+                        characterBody.velocity.y = jumpHeight;
                         isOnGround = false;
                     }
                     break;
@@ -1150,6 +1540,15 @@ function handleZombies(delta) {
         const clock = new THREE.Clock();
         function animate() {
             const delta = clock.getDelta();
+            const val = 1/60;
+            updatePhysics(val);
+
+            // Update wall positions
+            bodyMeshMap.forEach((mesh, body) => {
+                mesh.position.copy(body.position);
+                mesh.quaternion.copy(body.quaternion);
+            });
+
             if (!isGameOver) {
                 handleZombies(delta);
                 // ... (rest of your animate function)
@@ -1160,75 +1559,73 @@ function handleZombies(delta) {
            
             requestAnimationFrame(animate);
 
-            if (controls.isLocked === true) {
+            // if (controls.isLocked === true) {
 
                
 
-                const moveSpeed = 20;
-                const velocity = new THREE.Vector3();
+            //     const moveSpeed = 20;
+            //     const velocity = new THREE.Vector3();
 
-                if (moveForward) velocity.z += moveSpeed * delta;
-                if (moveBackward) velocity.z -= moveSpeed * delta;
-                if (moveLeft) velocity.x -= moveSpeed * delta;
-                if (moveRight) velocity.x += moveSpeed * delta;
+            //     if (moveForward) velocity.z += moveSpeed * delta;
+            //     if (moveBackward) velocity.z -= moveSpeed * delta;
+            //     if (moveLeft) velocity.x -= moveSpeed * delta;
+            //     if (moveRight) velocity.x += moveSpeed * delta;
 
-                controls.moveRight(velocity.x);
-                controls.moveForward(velocity.z);
+            //     controls.moveRight(velocity.x);
+            //     controls.moveForward(velocity.z);
 
-                // Apply gravity
-                velocityY += gravity * delta;
-                const playerPos = controls.object.position.clone();
+            //     // Apply gravity
+            //     velocityY += gravity * delta;
+            //     const playerPos = controls.object.position.clone();
 
-                // Calculate the new position
-                const newPosition = playerPos.clone();
-                newPosition.x += velocity.x;
-                newPosition.z += velocity.z;
-                newPosition.y += velocityY * delta;
+            //     // Calculate the new position
+            //     const newPosition = playerPos.clone();
+            //     newPosition.x += velocity.x;
+            //     newPosition.z += velocity.z;
+            //     newPosition.y += velocityY * delta;
 
-                // Get terrain height at the new position
-                const terrainHeight = getTerrainHeight(
-                    newPosition.x, newPosition.z, 
-                    terrainGeometry, width, length, 128
-                );
-      
-                
-              
+            //     // Get terrain height at the new position
+            //     const terrainHeight = getTerrainHeight(
+            //         newPosition.x, newPosition.z, 
+            //         terrainGeometry, width, length, 128
+            //     );
+    
 
-                // Check for collisions with the ground
-                if (newPosition.y < terrainHeight+4) {
-                    velocityY = 0;
-                    newPosition.y = terrainHeight+4;
-                    isOnGround = true;
-                }
+            //     // Check for collisions with the ground
+            //     if (newPosition.y < terrainHeight+4) {
+            //         velocityY = 0;
+            //         newPosition.y = terrainHeight+4;
+            //         isOnGround = true;
+            //     }
 
-                // Update player bounding box position based on camera
-                const playerPosition = controls.object.position;
-                playerBoundingBox.min.set(
-                    playerPosition.x - 0.5,
-                    playerPosition.y - 2,
-                    playerPosition.z - 0.5
-                );
-                playerBoundingBox.max.set(
-                    playerPosition.x + 0.5,
-                    playerPosition.y,
-                    playerPosition.z + 0.5
-                );
+            //     // Update player bounding box position based on camera
+            //     const playerPosition = controls.object.position;
+            //     playerBoundingBox.min.set(
+            //         playerPosition.x - 0.5,
+            //         playerPosition.y - 2,
+            //         playerPosition.z - 0.5
+            //     );
+            //     playerBoundingBox.max.set(
+            //         playerPosition.x + 0.5,
+            //         playerPosition.y,
+            //         playerPosition.z + 0.5
+            //     );
 
-                // Collision detection: Prevent moving into obstacles
-                obstacles.forEach(obstacle => {
-                    if (playerBoundingBox.intersectsBox(obstacle.boundingBox)) {
-                        // If colliding, stop movement
-                        controls.moveRight(-velocity.x);
-                        controls.moveForward(-velocity.z);
-                    }
-                });
+            //     // Collision detection: Prevent moving into obstacles
+            //     obstacles.forEach(obstacle => {
+            //         if (playerBoundingBox.intersectsBox(obstacle.boundingBox)) {
+            //             // If colliding, stop movement
+            //             controls.moveRight(-velocity.x);
+            //             controls.moveForward(-velocity.z);
+            //         }
+            //     });
 
-                // Keep the player within the arena bounds
-                playerPosition.x = Math.max(-width/2-1, Math.min(width/2-1, playerPosition.x));
-                playerPosition.z = Math.max(-width/2-1, Math.min(width/2-1, playerPosition.z));
-                playerPosition.y = Math.max(playerPosition.y, terrainHeight + 4);
+            //     // Keep the player within the arena bounds
+            //     playerPosition.x = Math.max(-width/2-1, Math.min(width/2-1, playerPosition.x));
+            //     playerPosition.z = Math.max(-width/2-1, Math.min(width/2-1, playerPosition.z));
+            //     playerPosition.y = Math.max(playerPosition.y, terrainHeight + 4);
 
-            }
+            // }
             
                 animateSun();
                 animateMoon();
