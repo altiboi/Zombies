@@ -59,7 +59,7 @@ const bodyMeshMap = new Map();
 // Create a player body
 const characterShape = new CANNON.Sphere(0.5); // Example shape
 const characterBody = new CANNON.Body({ mass: 1 });
-characterBody.position.set(0, 100, 0.5);
+characterBody.position.set(10, 10, 0.5);
 characterBody.addShape(characterShape);
 world.addBody(characterBody);
 
@@ -305,7 +305,7 @@ const createZombie = (skin, position) => {
         scene.add(fbx);
 
         const mixer = new THREE.AnimationMixer(fbx);
-        const zombieData = { fbx, mixer, actionChosen: false, chosenAction: null, isDead: false, life: 10 }; // Set life to 5
+        const zombieData = { fbx, mixer, actionChosen: false, chosenAction: null, isDead: false, life: 10, body: null };
 
         // Create a physics body for the zombie
         const zombieShape = new CANNON.Box(new CANNON.Vec3(1, 1, 1)); // Adjust size as needed
@@ -348,8 +348,264 @@ const createZombie = (skin, position) => {
                 child.receiveShadow = true;
             }
         });
+
+        // Add boundary checks and synchronization in the update loop
+        const updateZombie = (delta) => {
+            if (zombieData.mixer) zombieData.mixer.update(delta);
+
+            // Sync the position of the Three.js mesh with the Cannon.js physics body
+            fbx.position.copy(zombieBody.position);
+            fbx.quaternion.copy(zombieBody.quaternion);
+
+            // Ensure zombies stay within the world bounds
+            const minX = -300, maxX = 300;
+            const minY = 1, maxY = 10; // Keeping Y as 1 for ground level
+            const minZ = -300, maxZ = 300;
+
+            if (zombieBody.position.x < minX) zombieBody.position.x = minX;
+            if (zombieBody.position.x > maxX) zombieBody.position.x = maxX;
+            if (zombieBody.position.y < minY) zombieBody.position.y = minY;
+            if (zombieBody.position.y > maxY) zombieBody.position.y = maxY;
+            if (zombieBody.position.z < minZ) zombieBody.position.z = minZ;
+            if (zombieBody.position.z > maxZ) zombieBody.position.z = maxZ;
+
+            // Sync the position of the Three.js mesh with the adjusted Cannon.js physics body
+            fbx.position.copy(zombieBody.position);
+        };
+
+        // Add the update function to the zombies array for continuous updates
+        zombieData.update = updateZombie;
     });
 };
+
+class Zombie {
+    constructor(loader, scene, zombies, world) {
+        this.position = this.getRandomPosition(); // Randomly choose position
+        this.loader = loader;
+        this.scene = scene;
+        this.zombies = zombies;
+        this.world = world;
+        this.fbx = null;
+        this.mixer = null;
+        this.isDead = false;
+        this.life = 10; // Initial life
+        this.actionChosen = false;
+        this.chosenAction = null;
+        this.activeAction = null;
+        this.animations = {}; // Store the loaded animations
+        this.collisionDistance = 10; // Minimum distance between zombies to avoid collision
+        this.body = null; // Physics body
+
+        // List of available zombie models (textures)
+        this.availableSkins = [
+            '/Warzombie.fbx',
+            '/YakuZombie.fbx',
+            '/Zombiegirl.fbx'
+        ];
+
+        // Choose a random skin from availableSkins
+        this.skin = this.getRandomSkin();
+
+        // Load the zombie model and animations
+        this.loadModel();
+    }
+
+    // Method to randomly select a skin from availableSkins
+    getRandomSkin() {
+        const randomIndex = Math.floor(Math.random() * this.availableSkins.length);
+        return this.availableSkins[randomIndex];
+    }
+
+    // Method to randomly choose a position within a certain range
+    getRandomPosition() {
+        const minX = -300, maxX = 300;
+        const minY = 1, maxY = 1; // Keeping Y as 1 for ground level
+        const minZ = -300, maxZ = 300;
+
+        const randomX = Math.random() * (maxX - minX) + minX;
+        const randomY = Math.random() * (maxY - minY) + minY;
+        const randomZ = Math.random() * (maxZ - minZ) + minZ;
+
+        return new THREE.Vector3(randomX, randomY, randomZ);
+    }
+
+    loadModel() {
+        this.loader.load(this.skin, (fbx) => {
+            fbx.scale.setScalar(0.03);
+            fbx.position.copy(this.position);
+            fbx.name = 'Zombie';
+            this.scene.add(fbx);
+            this.fbx = fbx;
+
+            this.mixer = new THREE.AnimationMixer(fbx);
+
+            // Load animations
+            this.loadAnimations();
+
+            this.zombies.push(this);
+
+            fbx.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+
+            // Create physics body for the zombie
+            this.createPhysicsBody();
+
+            console.log('Zombie added to the scene:', this.fbx);
+        }, undefined, (error) => {
+            console.error('Error loading zombie model:', error);
+        });
+    }
+
+    loadAnimations() {
+        // Load run animation
+        this.loader.load('/Running.fbx', (fb) => {
+            this.animations.runAction = this.mixer.clipAction(fb.animations[0]);
+            this.animations.runAction.play();
+        });
+        // Load punch action
+        this.loader.load('/Zombie_Punching.fbx', (fb) => {
+            this.animations.punchAction = this.mixer.clipAction(fb.animations[0]);
+        });
+        this.loader.load('/zombie_idle.fbx', (fb) => {
+            this.animations.idleAction = this.mixer.clipAction(fb.animations[0]);
+        });
+        // Load bite neck action
+        this.loader.load('/zombie_biting_neck.fbx', (fb) => {
+            this.animations.biteNeckAction = this.mixer.clipAction(fb.animations[0]);
+        });
+        // Load dying animation 1
+        this.loader.load('/Zombie_Dying.fbx', (fb) => {
+            this.animations.Dying1 = this.mixer.clipAction(fb.animations[0]);
+            this.animations.Dying1.loop = THREE.LoopOnce; // Play once
+            this.animations.Dying1.clampWhenFinished = true; // Stop resetting
+        });
+        // Load dying animation 2
+        this.loader.load('/Zombie_Death.fbx', (fb) => {
+            this.animations.Dying2 = this.mixer.clipAction(fb.animations[0]);
+            this.animations.Dying2.loop = THREE.LoopOnce;
+            this.animations.Dying2.clampWhenFinished = true;
+        });
+    }
+
+    // Create physics body for the zombie
+    createPhysicsBody() {
+        const shape = new CANNON.Box(new CANNON.Vec3(0.5, 1, 0.5)); // Adjust size as needed
+        this.body = new CANNON.Body({ mass: 1 });
+        this.body.addShape(shape);
+        this.body.position.copy(this.position);
+        this.body.userData = { type: 'zombie' }; // Add user data for collision detection
+        this.world.addBody(this.body);
+    }
+
+    // Check collision with other zombies and avoid them
+    avoidCollisionWithOtherZombies() {
+        this.zombies.forEach(zombie => {
+            if (zombie !== this && !zombie.isDead) {
+                const distance = this.fbx.position.distanceTo(zombie.fbx.position);
+                if (distance < this.collisionDistance) {
+                    // Adjust direction to avoid the collision
+                    const directionAway = new THREE.Vector3().subVectors(this.fbx.position, zombie.fbx.position).normalize();
+                    this.fbx.position.add(directionAway.multiplyScalar(1)); // Move 1 unit away
+                    this.body.position.copy(this.fbx.position); // Sync physics body with Three.js mesh
+                }
+            }
+        });
+    }
+
+    update(delta, controls) {
+        if (this.mixer) this.mixer.update(delta);
+
+        const zombiePosition = new THREE.Vector3();
+        const cameraPosition = new THREE.Vector3(controls.object.position.x, 0, controls.object.position.z);
+        this.fbx.getWorldPosition(zombiePosition);
+
+        const direction = new THREE.Vector3().subVectors(cameraPosition, zombiePosition).normalize();
+        this.fbx.lookAt(cameraPosition);
+
+        const distanceToCamera = zombiePosition.distanceTo(cameraPosition);
+
+        // Avoid collision with other zombies
+        this.avoidCollisionWithOtherZombies();
+
+        // 1. If far from the camera (> 100), play idle action
+        if (distanceToCamera > 20) {
+            if (this.animations.idleAction) {
+                this.switchAction(this.animations.idleAction);
+            }
+        } 
+        // 2. If close to the camera (within minimumDistance), attack
+        else if (distanceToCamera <= minimumDistance) {
+            const attackActions = [this.animations.punchAction, this.animations.biteAction, this.animations.biteNeckAction];
+            if (!this.actionChosen) {
+                this.chosenAction = this.getRandomAction(attackActions);
+                this.actionChosen = true;
+            }
+
+            if (this.chosenAction) {
+                this.switchAction(this.chosenAction);
+            }
+        } 
+        // 3. If in between (between minimumDistance and 100), move towards the camera and run
+        else {
+            this.actionChosen = false; // Reset chosen action
+            this.fbx.position.add(direction.multiplyScalar(zombieSpeed * delta)); // Move zombie
+            this.body.position.copy(this.fbx.position); // Sync physics body with Three.js mesh
+
+            // Play running animation
+            if (this.animations.runAction) {
+                this.animations.runAction.timeScale = zombieSpeed / 16;
+                this.switchAction(this.animations.runAction);
+            }
+        }
+
+        // Ensure zombies stay within the world bounds
+        this.checkBounds();
+    }
+
+    // Ensure zombies stay within the world bounds
+    checkBounds() {
+        const minX = -300, maxX = 300;
+        const minY = 1, maxY = 1; // Keeping Y as 1 for ground level
+        const minZ = -300, maxZ = 300;
+
+        if (this.fbx.position.x < minX) this.fbx.position.x = minX;
+        if (this.fbx.position.x > maxX) this.fbx.position.x = maxX;
+        if (this.fbx.position.y < minY) this.fbx.position.y = minY;
+        if (this.fbx.position.y > maxY) this.fbx.position.y = maxY;
+        if (this.fbx.position.z < minZ) this.fbx.position.z = minZ;
+        if (this.fbx.position.z > maxZ) this.fbx.position.z = maxZ;
+
+        this.body.position.copy(this.fbx.position); // Sync physics body with Three.js mesh
+    }
+
+    getRandomAction(actions) {
+        actions = actions.filter(action => action); // Filter out undefined actions
+        const randomIndex = Math.floor(Math.random() * actions.length);
+        return actions[randomIndex];
+    }
+
+    switchAction(toAction) {
+        if (this.activeAction !== toAction) {
+            if (this.activeAction) this.activeAction.fadeOut(0.5); // Smooth transition
+            toAction.reset().fadeIn(0.5).play(); // Play the new animation
+            this.activeAction = toAction; // Update active action
+        }
+    }
+}
+
+// Instantiate zombies
+function createZombies(loader, scene, zombies, world) {
+    for (let i = 0; i < 15; i++) {
+        new Zombie(loader, scene, zombies, world);
+    }
+}
+
+// Create different zombies using the Zombie class
+//createZombies(loader, scene, zombies, world);
     
 
 function createWall(terrainGeometry) {
@@ -389,15 +645,15 @@ function createWall(terrainGeometry) {
     });
 
     // Function to create a wall and add it to the scene and physics world
-    function createWallMeshAndBody(position, rotation = 0) {
-        const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
+    function createWallMeshAndBody(position, rotation = 0, width, height, depth) {
+        const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), wallMaterial);
         wallMesh.position.copy(position);
         wallMesh.rotation.y = rotation;
         wallMesh.castShadow = true;
         wallMesh.receiveShadow = true;
         scene.add(wallMesh);
 
-        const wallShape = new CANNON.Box(new CANNON.Vec3(0.5, 15, 0.5)); // Adjust size as needed
+        const wallShape = new CANNON.Box(new CANNON.Vec3(width / 2, height / 2, depth / 2)); // Adjust size as needed
         const wallBody = new CANNON.Body({ mass: 0 }); // Static body
         wallBody.addShape(wallShape);
         wallBody.position.copy(position);
@@ -410,19 +666,19 @@ function createWall(terrainGeometry) {
 
     // Create front wall
     const frontWallHeight = getTerrainHeight(0, -width / 2, terrainGeometry, width, length, 128); // Adjust based on resolution
-    createWallMeshAndBody(new THREE.Vector3(0, frontWallHeight + 10, -width / 2));
+    createWallMeshAndBody(new THREE.Vector3(0, frontWallHeight + 10 - 1, -width / 2), 0, width, 30, 1);
 
     // Create back wall
     const backWallHeight = getTerrainHeight(0, width / 2, terrainGeometry, width, length, 128);
-    createWallMeshAndBody(new THREE.Vector3(0, backWallHeight + 10, width / 2));
+    createWallMeshAndBody(new THREE.Vector3(0, backWallHeight + 10 - 1, width / 2), 0, width, 30, 1);
 
     // Create left wall
     const leftWallHeight = getTerrainHeight(-width / 2, 0, terrainGeometry, width, length, 128);
-    createWallMeshAndBody(new THREE.Vector3(-width / 2, leftWallHeight + 10, 0), Math.PI / 2);
+    createWallMeshAndBody(new THREE.Vector3(-width / 2, leftWallHeight + 10 - 1, 0), Math.PI / 2, length, 30, 1);
 
     // Create right wall
     const rightWallHeight = getTerrainHeight(width / 2, 0, terrainGeometry, width, length, 128);
-    createWallMeshAndBody(new THREE.Vector3(width / 2, rightWallHeight + 10, 0), Math.PI / 2);
+    createWallMeshAndBody(new THREE.Vector3(width / 2, rightWallHeight + 10 - 1, 0), Math.PI / 2, length, 30, 1);
 }
 
 let worldTerrain;
@@ -506,7 +762,7 @@ function createTerrain() {
             terrainBody.addShape(terrainShape);
             
             // Set the position and rotation to match the Three.js terrain
-            terrainBody.position.set(0, 0, 0);
+            terrainBody.position.set(0, 1, 0);
             terrainBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
 
             // Add the terrain body to the world
@@ -802,7 +1058,7 @@ function addTrees() {
         obstacles.push({ mesh: trunk, boundingBox: treeBoundingBox });
 
         // Create a physics body for the tree trunk
-        const trunkShape = new CANNON.Cylinder(trunkRadius, trunkRadius * 1.2, trunkHeight, 8);
+        const trunkShape = new CANNON.Cylinder(trunkRadius, trunkRadius * 1.2, trunkHeight, 32);
         const trunkBody = new CANNON.Body({ mass: 0 }); // Static body
         trunkBody.addShape(trunkShape);
         trunkBody.position.set(x, trunkHeight / 2, z);
@@ -814,7 +1070,10 @@ function addTrees() {
 }
 
 addTrees();
-createZombie('/Warzombie.fbx', new THREE.Vector3(50,0,200));
+createZombie('/Warzombie.fbx', new THREE.Vector3(50,20,200));
+createZombie('/Warzombie.fbx', new THREE.Vector3(50,20,210));
+createZombie('/Warzombie.fbx', new THREE.Vector3(50,20,220));
+createZombie('/Warzombie.fbx', new THREE.Vector3(50,20,230));
      
 
 function addStructures() {
@@ -937,7 +1196,7 @@ function addStructures() {
         scene.add(structureGroup);
 
         // Create physics bodies for each wall
-        const wallThickness = 1;
+        const wallThickness = 10;
         const leftWallShape = new CANNON.Box(new CANNON.Vec3(wallThickness / 2, height / 2, depth / 2));
         const rightWallShape = new CANNON.Box(new CANNON.Vec3(wallThickness / 2, height / 2, depth / 2));
         const backWallShape = new CANNON.Box(new CANNON.Vec3(structureWidth / 2, height / 2, wallThickness / 2));
@@ -1082,7 +1341,7 @@ function handleZombies(delta) {
         fbx.lookAt(cameraPosition);
 
         const distanceToCamera = zombiePosition.distanceTo(cameraPosition);
-        //console.log(distanceToCamera);
+        console.log(distanceToCamera);
 
         // Handle zombie death
         if (!zombie.isDead && isShiftPressed) {
@@ -1403,9 +1662,8 @@ function updatePhysics(deltaTime) {
     // Update camera position
     camera.position.copy(characterBody.position);
 
-    // Check if character is on the ground
-    if (characterBody.position.y <= 0.5) {
-        isOnGround = true;
+    if(worldTerrain && !isOnGround  ){
+    checkIfOnGround(); 
     }
 
     // Update zombies' positions
@@ -1452,7 +1710,17 @@ function updatePhysics(deltaTime) {
     paintballsToRemove.length = 0; // Clear the array
 }
 
+// Function to check if the character is on the ground
+function checkIfOnGround() {
+    const ray = new CANNON.Ray();
+    ray.from = new CANNON.Vec3().copy(characterBody.position);
+    ray.to = new CANNON.Vec3(characterBody.position.x, characterBody.position.y - 1, characterBody.position.z); // Cast ray downward
 
+    const result = new CANNON.RaycastResult();
+    ray.intersectBody(worldTerrain, result);
+
+    isOnGround = result.hasHit;
+}
        
         let moveForward = false;
         let moveBackward = false;
@@ -1461,7 +1729,7 @@ function updatePhysics(deltaTime) {
         let canJump = false;
         let velocityY = 0;
         const gravity = -9.8;
-        const jumpHeight = 15;
+        const jumpHeight = 5;
         let isOnGround = true;
         let isShiftPressed = false;
 
@@ -1485,6 +1753,7 @@ function updatePhysics(deltaTime) {
                     break;
                 case 'Space':
                     if (isOnGround) {
+                        console.log("Jumping"); 
                         characterBody.velocity.y = jumpHeight;
                         isOnGround = false;
                     }
@@ -1529,12 +1798,6 @@ function updatePhysics(deltaTime) {
 
         controls.object.position.set(80, 2, 80);
         scene.add(controls.object);
-
-        // Player bounding box
-        const playerBoundingBox = new THREE.Box3(
-            new THREE.Vector3(-0.5, 0, -0.5),
-            new THREE.Vector3(0.5, 2, 0.5)
-        );
 
         // Animation loop
         const clock = new THREE.Clock();
@@ -1645,4 +1908,3 @@ function updatePhysics(deltaTime) {
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
- 
