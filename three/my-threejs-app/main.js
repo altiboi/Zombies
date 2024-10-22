@@ -175,7 +175,7 @@ collect() {
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight , 0.1, 1000);
-
+camera.position.set(0, 5, 0);
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true; // Enable shadows
@@ -447,7 +447,7 @@ createTerrain();
         
 const createZombie = (skin, position) => {
     loader.load(skin, (fbx) => {
-        fbx.scale.setScalar(0.03);
+        fbx.scale.setScalar(0.04);
         fbx.position.copy(position);
         fbx.name = 'Zombie';
         scene.add(fbx);
@@ -456,7 +456,7 @@ const createZombie = (skin, position) => {
         const zombieData = { fbx, mixer, actionChosen: false, chosenAction: null, isDead: false, life: 10, body: null };
 
         // Create a physics body for the zombie
-        const zombieShape = new CANNON.Box(new CANNON.Vec3(1, 1, 1)); // Adjust size as needed
+        const zombieShape = new CANNON.Box(new CANNON.Vec3(1, 2, 1)); // Adjust size as needed
         const zombieBody = new CANNON.Body({ mass: 1 });
         zombieBody.addShape(zombieShape);
         zombieBody.position.copy(position);
@@ -506,7 +506,7 @@ const createZombie = (skin, position) => {
 
             // Ensure zombies stay within the world bounds
             const minX = -300, maxX = 300;
-            const minY = 1, maxY = 10; // Keeping Y as 1 for ground level
+            const minY = 0, maxY = 10; // Keeping Y as 1 for ground level
             const minZ = -300, maxZ = 300;
 
             if (zombieBody.position.x < minX) zombieBody.position.x = minX;
@@ -867,7 +867,7 @@ function createTerrain() {
             const vertices = terrainGeometry.attributes.position.array;
             for (let i = 0, j = 0, l = vertices.length; i < l; i++, j += 3) {
                 const heightValue = imageData.data[i * 4]; // Assuming grayscale image, use only the red channel
-                vertices[j + 2] = heightValue / 255 * 10; // Adjust the division factor to control the terrain height
+                vertices[j + 2] = 0; // Adjust the division factor to control the terrain height
             }
 
             // Update normals to account for the new vertex positions
@@ -909,7 +909,7 @@ function createTerrain() {
             terrainBody.addShape(terrainShape);
             
             // Set the position and rotation to match the Three.js terrain
-            terrainBody.position.set(0, 1, 0);
+            terrainBody.position.set(0, 0, 0);
             terrainBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
 
             // Add the terrain body to the world
@@ -1246,7 +1246,7 @@ function addZombies(playerPosition) {
         }
 
         // Create the zombie using the createZombie function
-        createZombie('/Warzombie.fbx', new THREE.Vector3(x, 0, z));
+        createZombie('/Warzombie.fbx', new THREE.Vector3(x, 1, z));
 
         // Increment the count of placed zombies
         placedZombies++;
@@ -1786,8 +1786,26 @@ function createBulletTrail(paintballMesh) {
     return trail;
 }
 
+// Load the gunshot sound
+const listener = new THREE.AudioListener();
+camera.add(listener);
+
+const gunshotSound = new THREE.Audio(listener);
+const audioLoader = new THREE.AudioLoader();
+audioLoader.load('./gunshot.wav', (buffer) => {
+    gunshotSound.setBuffer(buffer);
+    gunshotSound.setVolume(0.5); // Adjust volume as needed
+});
+
 // Shooting logic with a max of 50 paintballs
 function shootPaintball() {
+
+    // Play the gunshot sound
+    if (gunshotSound.isPlaying) {
+        gunshotSound.stop();
+    }
+    gunshotSound.play();
+    
     if (paintballs.length >= 50) {
         const oldestPaintball = paintballs.shift();
         world.removeBody(oldestPaintball.body);
@@ -1842,6 +1860,21 @@ function shootPaintball() {
    paintballBody.addEventListener('collide', (event) => {
         const collidedWith = event.body; // The body the paintball collided with
         console.log('Paintball collided with:', collidedWith);
+        
+        // Check if the collided body is a zombie
+        const zombie = zombies.find(z => z.body === collidedWith);
+        if (zombie) {
+            // Decrease zombie's health
+            zombie.life -= 1;
+            console.log(`Zombie hit! Remaining life: ${zombie.life}`);
+            if (zombie.life <= 0) {
+                // Remove zombie from the scene and physics world
+                scene.remove(zombie.fbx);
+                world.removeBody(zombie.body);
+                zombies.splice(zombies.indexOf(zombie), 1);
+                console.log('Zombie killed!');
+            }
+        }
 
         // Get the corresponding THREE.Mesh object
         const intersectedObject = bodyMeshMap.get(collidedWith);
@@ -1894,24 +1927,38 @@ function updatePhysics(deltaTime) {
 
     // Update camera position
     camera.position.copy(characterBody.position);
+    camera.position.y = 3; // Adjust the camera height as needed
 
-    if(worldTerrain && !isOnGround  ){
-    checkIfOnGround(); 
+    if (worldTerrain && !isOnGround) {
+        checkIfOnGround();
     }
 
     // Update zombies' positions
     zombies.forEach(zombie => {
         if (zombie.body) {
+            // Sync the position of the Three.js mesh with the Cannon.js physics body
             zombie.fbx.position.copy(zombie.body.position);
             zombie.fbx.quaternion.copy(zombie.body.quaternion);
 
-            // // Example: Simple AI for zombie movement towards the player
-            // const zombieVelocity = zombie.body.velocity;
-            // const toPlayer = new THREE.Vector3().subVectors(characterBody.position, zombie.body.position);
-            // toPlayer.normalize();
-            // const zombieSpeed = 5; // Adjust speed as needed
-            // zombieVelocity.x = toPlayer.x * zombieSpeed;
-            // zombieVelocity.z = toPlayer.z * zombieSpeed;
+            // Ensure zombies stay within the world bounds
+            const minX = -300, maxX = 300;
+            const minY = 0, maxY = 10; // Keeping Y as 1 for ground level
+            const minZ = -300, maxZ = 300;
+
+            if (zombie.body.position.x < minX) zombie.body.position.x = minX;
+            if (zombie.body.position.x > maxX) zombie.body.position.x = maxX;
+            if (zombie.body.position.y < minY) zombie.body.position.y = minY;
+            if (zombie.body.position.y > maxY) zombie.body.position.y = maxY;
+            if (zombie.body.position.z < minZ) zombie.body.position.z = minZ;
+            if (zombie.body.position.z > maxZ) zombie.body.position.z = maxZ;
+
+            // Example: Simple AI for zombie movement towards the player
+            const zombieVelocity = zombie.body.velocity;
+            const toPlayer = new THREE.Vector3().subVectors(characterBody.position, zombie.body.position);
+            toPlayer.normalize();
+            const zombieSpeed = 5; // Adjust speed as needed
+            zombieVelocity.x = toPlayer.x * zombieSpeed;
+            zombieVelocity.z = toPlayer.z * zombieSpeed;
         }
     });
 
@@ -2055,7 +2102,6 @@ function checkIfOnGround() {
                 mesh.quaternion.copy(body.quaternion);
             });
 
-            if (!isGameOver) {
             if (!isGameOver&&!isPaused) {
                 handleZombies(delta);
                 // ... (rest of your animate function)
