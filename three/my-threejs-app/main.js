@@ -747,7 +747,67 @@ function addTrees() {
 }
 
 addTrees();
-createZombie('/Warzombie.fbx', new THREE.Vector3(50,0,200));
+function addZombies(playerPosition) {
+    const zombieCount = width * 0.01 + currentLevel; // Adjust based on desired density
+    const maxAttempts = zombieCount * 10; // Maximum attempts to find valid positions
+    let placedZombies = 0;
+    let attempts = 0;
+
+    while (placedZombies < zombieCount && attempts < maxAttempts) {
+        attempts++;
+        const x = Math.random() * width - width / 2;
+        const z = Math.random() * width - width / 2;
+
+        // Calculate the distance from the player to the potential zombie position
+        const distanceToPlayer = Math.sqrt(Math.pow(playerPosition.x - x, 2) + Math.pow(playerPosition.z - z, 2));
+
+        // Ensure the zombie is at least 150 units away from the player's position
+        if (distanceToPlayer < 150) {
+            continue; // Skip this iteration if the zombie is too close to the player
+        }
+
+        // Define the dimensions for the zombie bounding box
+        const zombieWidth = 2; // Adjust as needed
+        const zombieDepth = 2; // Adjust as needed
+
+        // Check if the space is clear for the zombie
+        if (!isSpaceClear(x, z, zombieWidth, zombieDepth)) {
+            continue; // Skip this iteration if the space is not clear
+        }
+
+        // Create the zombie using the createZombie function
+        createZombie('/Warzombie.fbx', new THREE.Vector3(x, 0, z));
+
+        // Increment the count of placed zombies
+        placedZombies++;
+    }
+
+    if (attempts >= maxAttempts) {
+        console.log('Max attempts reached, could not place all zombies.');
+    }
+}
+
+// Ensure that the isSpaceClear function is accessible
+function isSpaceClear(x, z, structureWidth, depth) {
+    const margin = 1; // Margin for the zombie bounding box
+    const checkBox = new THREE.Box3(
+        new THREE.Vector3(x - structureWidth / 2 - margin, 0, z - depth / 2 - margin),
+        new THREE.Vector3(x + structureWidth / 2 + margin, 100, z + depth / 2 + margin)
+    );
+
+    // Check against existing obstacles
+    for (let obstacle of obstacles) {
+        if (checkBox.intersectsBox(obstacle.boundingBox)) {
+            return false; // Space is not clear
+        }
+    }
+
+    return true; // Space is clear
+}
+
+addZombies(controls.object.position);
+
+
      
 
 function addStructures() {
