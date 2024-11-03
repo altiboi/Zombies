@@ -36,8 +36,8 @@ let daySkyMaterial, nightSkyMaterial;
 let playerLife = 10; // Player starts with 5 life points
 let moveSpeed = 10;
 let kills = 0;
-let currentLevel = localStorage.getItem('currentLevel') && localStorage.getItem('currentLevel') < 4?localStorage.getItem('currentLevel'):1; 
-let zombiesToKill = localStorage.getItem('zombiesToKill') ? localStorage.getItem('zombiesToKill') : 5;
+let currentLevel = parseInt(localStorage.getItem('currentLevel') && localStorage.getItem('currentLevel') < 4?localStorage.getItem('currentLevel'):1); 
+let zombiesToKill = parseInt(localStorage.getItem('zombiesToKill') ? localStorage.getItem('zombiesToKill') : 5);
 let isGameOver = false;
 let gameOverScreen;
 let isPaused = false; // Game pause state
@@ -313,14 +313,22 @@ document.addEventListener('keydown', (event) => {
 });
 
 const MalescreamSound = new Audio('./assets/audio/scream.mp3'); // Replace with your audio file path
-MalescreamSound.volume = 0.5; // Set volume to 70%
+MalescreamSound.volume = 0.4;
 
 const forestSound = new Audio('./assets/audio/forest.mp3'); // Replace with your audio file path
 forestSound.loop = true; // Loop the sound for continuous play
-forestSound.volume = 0.4; // Set volume to 70%
+forestSound.volume = 0.4;
 
 const Endmusic = new Audio('./assets/audio/gameover.mp3');
-Endmusic.volume = 0.5; // Set volume to 70%
+Endmusic.volume = 0.5;
+
+const heavyBreathingSound = new Audio('./assets/audio/breathing.mp3'); // Replace with your audio file path
+heavyBreathingSound.loop = true; // Loop the sound for continuous play
+heavyBreathingSound.volume = 0.4;
+
+const heartbeatSound = new Audio('./assets/audio/heartbeat.mp3')
+heartbeatSound.loop = true;
+heartbeatSound.volume = 0.4;
 
 // Function to start playing the background sound
 function startBackgroundSound() {
@@ -429,24 +437,95 @@ lifeBar.style.transition = 'width 0.3s'; // Smooth transition when life changes
 lifeBarContainer.appendChild(lifeBar);
 document.body.appendChild(lifeBarContainer);
 
+// Create the red overlay
+const redOverlay = document.createElement('div');
+redOverlay.style.position = 'absolute';
+redOverlay.style.top = '0';
+redOverlay.style.left = '0';
+redOverlay.style.width = '100%';
+redOverlay.style.height = '100%';
+redOverlay.style.backgroundColor = 'rgba(255, 0, 0, 0.5)'; // Semi-transparent red
+redOverlay.style.pointerEvents = 'none'; // Allow clicks to pass through
+redOverlay.style.display = 'none'; // Initially hidden
+redOverlay.style.zIndex = '9999'; // Ensure it is on top of other elements
+document.body.appendChild(redOverlay);
+
+// Define the pulsating animation using CSS
+const style = document.createElement('style');
+style.innerHTML = `
+@keyframes pulsate {
+    0% { opacity: 0.5; }
+    50% { opacity: 0.8; }
+    100% { opacity: 0.5; }
+}
+.pulsate {
+    animation: pulsate 1s infinite;
+}
+`;
+document.head.appendChild(style);
+
 // Update life bar based on player's current life
 function updateLifeBar() {
     const lifePercentage = (playerLife / 10) * 100; // Convert to percentage
     lifeBar.style.width = `${lifePercentage}%`; // Adjust based on life percentage
 
-
-    if (lifePercentage <= 50 && lifePercentage > 20) {
-        lifeBar.style.backgroundColor = 'yellow'; // Change color when life is low
-    }
-    else if (lifePercentage <= 20) {
-        lifeBar.style.backgroundColor = 'red'; // Critical life level
-        MalescreamSound.play().catch(error => {
-            console.error("Error playing scream sound:", error);
-        });
-        
-    }else if(lifePercentage > 20){
+    if (lifePercentage > 50) {
+        lifeBar.style.backgroundColor = 'green'; // Healthy color
+        heavyBreathingSound.pause();
+        heavyBreathingSound.currentTime = 0;
+        heartbeatSound.pause();
+        heartbeatSound.currentTime = 0;
         MalescreamSound.pause();
         MalescreamSound.currentTime = 0;
+        redOverlay.style.display = 'none';
+        redOverlay.classList.remove('pulsate');
+    } else if (lifePercentage <= 50 && lifePercentage > 30) {
+        lifeBar.style.backgroundColor = 'yellow'; // Change color when life is low
+        heavyBreathingSound.pause();
+        heavyBreathingSound.currentTime = 0;
+        heartbeatSound.pause();
+        heartbeatSound.currentTime = 0;
+        MalescreamSound.pause();
+        MalescreamSound.currentTime = 0;
+        redOverlay.style.display = 'none';
+        redOverlay.classList.remove('pulsate');
+    } else if (lifePercentage <= 30 && lifePercentage > 20) {
+        lifeBar.style.backgroundColor = 'yellow';
+        if (heavyBreathingSound.paused) {
+            heavyBreathingSound.play().catch(error => {
+                console.error("Error playing breathing sound:", error);
+            });
+        }
+        heartbeatSound.pause();
+        heartbeatSound.currentTime = 0;
+        MalescreamSound.pause();
+        MalescreamSound.currentTime = 0;
+        redOverlay.style.display = 'none';
+        redOverlay.classList.remove('pulsate');
+    } else if (lifePercentage <= 20 && lifePercentage > 10) {
+        lifeBar.style.backgroundColor = 'red';
+        if (heartbeatSound.paused) {
+            heartbeatSound.play().catch(error => {
+                console.error("Error playing heartbeat sound:", error);
+            });
+        }
+        MalescreamSound.pause();
+        MalescreamSound.currentTime = 0;
+        redOverlay.style.display = 'block'; // Show the red overlay
+        redOverlay.classList.add('pulsate'); // Add the pulsate animation
+    } else if (lifePercentage <= 10) {
+        lifeBar.style.backgroundColor = 'red'; // Critical life level
+        if (MalescreamSound.paused) {
+            MalescreamSound.play().catch(error => {
+                console.error("Error playing scream sound:", error);
+            });
+        }
+        heavyBreathingSound.pause();
+        heavyBreathingSound.currentTime = 0;
+        heartbeatSound.pause();
+        heartbeatSound.currentTime = 0;
+        redOverlay.style.display = 'block'; // Show the red overlay
+        redOverlay.classList.add('pulsate'); // Add the pulsate animation
     }
 }
 
@@ -532,7 +611,7 @@ function addZombies(playerPosition) {
         }
 
         // Create the zombie using the createZombie function
-        const zombie = new Zombie(loader, scene, zombies, world);
+        const zombie = new Zombie(loader, scene, zombies, world, currentLevel);
         zombies.push(zombie);
         // Increment the count of placed zombies
         placedZombies++;
@@ -1275,7 +1354,7 @@ function handleZombies(delta) {
 
         if (zombie.isAttacking) {
             if (playerLife > 0 && zombie.life > 0) {
-                playerLife -= 0.25 * delta; // Decrement by 0.5 per second
+                playerLife -= 0.1 * delta; // Decrement by 0.5 per second
                 updateLifeBar(); // Update the life bar based on player's life
                 if (playerLife <= 0) {
                     playerLife = 0;

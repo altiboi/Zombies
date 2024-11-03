@@ -3,7 +3,7 @@ import * as CANNON from 'cannon-es';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { gsap } from 'gsap/gsap-core';
 class Zombie {
-    constructor(loader, scene, zombies, world) {
+    constructor(loader, scene, zombies, world, currentLevel) {
         this.position = this.getRandomPosition(); // Randomly choose position
         this.loader = loader;
         this.scene = scene;
@@ -13,8 +13,8 @@ class Zombie {
         this.model = null;
         this.mixer = null;
         this.isDead = false;
-        this.maxLife = 8; // Maximum life
-        this.life = 8; // Initial life
+        this.maxLife = 8 + (currentLevel - 1) * 2; // Maximum life
+        this.life = this.maxLife; // Initial life
         this.lifeBar = null; // Life bar sprite
         this.actionChosen = false;
         this.chosenAction = null;
@@ -349,11 +349,16 @@ class Zombie {
         this.avoidCollisionWithOtherZombies();
 
         // Play sound only when within a certain proximity to the player
-        const soundProximity = 50; // Adjust this value as needed
+        const soundProximity = 40; // Adjust this value as needed
         if (distanceToCamera <= soundProximity) {
             if (this.sound.paused) {
                 this.sound.play();
             }
+            // Adjust volume based on distance
+            const maxVolumeDistance = 10; // Distance at which the volume is at maximum
+            const minVolumeDistance = soundProximity; // Distance at which the volume is at minimum
+            const volume = 0.1 - (distanceToCamera - maxVolumeDistance) / (minVolumeDistance - maxVolumeDistance);
+            this.sound.volume = Math.max(0, Math.min(0.1, volume)); // Clamp volume between 0 and 1
         } else {
             if (!this.sound.paused) {
                 this.sound.pause();

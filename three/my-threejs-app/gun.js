@@ -25,7 +25,7 @@ export function initGun(zombiesArray, bodyMeshMapInstance, renderer, camera) {
     const currentLevel = parseInt(localStorage.getItem('currentLevel')) || 1;
 
     // Adjust the magazine size based on the current level
-    magazineSize = Math.max(30 - (currentLevel - 1) * 10, 10); // Decrease by 2 per level, minimum of 10
+    magazineSize = Math.max(25 - (currentLevel - 1) * 5, 10); // Decrease by 2 per level, minimum of 10
     currentAmmo = magazineSize;
 
     // Load the gun model
