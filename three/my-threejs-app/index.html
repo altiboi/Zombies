@@ -2,140 +2,138 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite App</title>
+    <title>Game Start Menu</title>
     <style>
-        body { margin: 0; }
-        canvas { display: block; }
-        #instructions {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.5);
-            color: white;
-            padding: 10px;
-            font-family: Arial, sans-serif;
-        }
-        #crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 4px; /* Adjust the center dot size */
-            height: 4px;
-            background: whitesmoke;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-        }
+      body, html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #000;
+        color: white;
+        font-family: Arial, sans-serif;
+      }
 
-        .crosshair-line {
-            position: absolute;
-            background: whitesmoke;
-            pointer-events: none;
-        }
+      #start-menu {
+        text-align: center;
+      }
 
-        #crosshair-line-top,
-        #crosshair-line-bottom {
-            width: 2px;
-            height: 15px; /* Adjust the length of the vertical lines */
-        }
+      #start-menu h1 {
+        font-size: 48px;
+        margin-bottom: 20px;
+      }
 
-        #crosshair-line-left,
-        #crosshair-line-right {
-            width: 15px; /* Adjust the length of the horizontal lines */
-            height: 2px;
-        }
+      #start-menu button {
+        font-size: 24px;
+        padding: 10px 20px;
+        cursor: pointer;
+        background-color: #28a745;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        transition: background-color 0.3s;
+        margin: 5px;
+      }
 
-        #crosshair-line-top {
-            top: calc(50% - 25px); /* Adjust the gap above the center */
-            left: 50%;
-            transform: translateX(-50%);
-        }
+      #start-menu button:disabled {
+        background-color: #555;
+        cursor: not-allowed;
+      }
 
-        #crosshair-line-bottom {
-            top: calc(50% + 10px); /* Adjust the gap below the center */
-            left: 50%;
-            transform: translateX(-50%);
-        }
-
-        #crosshair-line-left {
-            top: 50%;
-            left: calc(50% - 25px); /* Adjust the gap to the left of the center */
-            transform: translateY(-50%);
-        }
-
-        #crosshair-line-right {
-            top: 50%;
-            left: calc(50% + 10px); /* Adjust the gap to the right of the center */
-            transform: translateY(-50%);
-        }
-        #loading-screen {
+      #controls-overlay {
+        display: none;
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        background: #000;
-        color: #fff;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        flex-direction: column;
+        font-size: 20px;
+        z-index: 100;
       }
-      #progress-container {
-        width: 80%;
-        background: #333;
-        height: 20px;
-      }
-      #progress-bar {
-        width: 0;
-        height: 100%;
-        background: #00ff00;
-      }
-      .overlay {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 88px; /* Adjust the size as needed */
-            color: white; /* Text color */
-            background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
-            padding: 20px;
-            border-radius: 10px;
-            display: none; /* Initially hidden */
-            z-index: 100; /* Ensure it appears above other elements */
-        }
 
-        #playSign {
-            color: green; /* Play sign color */
-            display: none; /* Initially hidden */
-        }
+      #controls-content {
+        position: relative;
+        padding: 20px;
+        background: rgba(50, 50, 50, 0.9);
+        border-radius: 10px;
+        max-width: 300px;
+        text-align: left;
+      }
+
+      #controls-content h2 {
+        margin-top: 0;
+      }
+
+      #close-controls {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 24px;
+        color: white;
+        cursor: pointer;
+      }
     </style>
   </head>
   <body>
-    <div id="instructions">
-        Click to start<br>
-        WASD to move<br>
-        Mouse to look around<br>
-        ESC to release mouse
+    <div id="start-menu">
+      <h1>Welcome to the Game</h1>
+      <button onclick="startGame()">Start Game</button>
+      <button id="resumeButton" onclick="resumeGame()" disabled>Resume Game</button>
+      <button onclick="showControls()">Show Controls</button>
     </div>
-        <div id="crosshair">
-        <div id="crosshair-line-top" class="crosshair-line"></div>
-        <div id="crosshair-line-bottom" class="crosshair-line"></div>
-        <div id="crosshair-line-left" class="crosshair-line"></div>
-        <div id="crosshair-line-right" class="crosshair-line"></div>
-    </div>
-    <div id="loading-screen">
-        <div>Loading... Please wait</div>
-        <div id="progress-container">
-          <div id="progress-bar"></div>
-        </div>
-      </div>
 
-      <div id="pauseSign" class="overlay">PAUSED</div>
-      <div id="playSign" class="overlay">PLAY</div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
-    <script type="module" src="/main.js"></script>
+    <!-- Controls Overlay -->
+    <div id="controls-overlay">
+      <div id="controls-content">
+        <span id="close-controls" onclick="showControls()">×</span>
+        <h2>Controls</h2>
+        <p>W - Move forward</p>
+        <p>A - Move left</p>
+        <p>S - Move backward</p>
+        <p>D - Move right</p>
+        <p>Mouse - Look around</p>
+        <p>ESC - Release mouse</p>
+      </div>
+    </div>
+
+    <script>
+      window.onload = () => {
+  document.getElementById('controls-overlay').style.display = 'none';
+};
+      // Function to start a new game
+      function startGame() {
+        // Reset current level and redirect to index.html
+        localStorage.setItem('currentLevel', 1);
+        window.location.href = 'level1.html';
+      }
+
+      // Function to resume the game
+      function resumeGame() {
+        window.location.href = `level${localStorage.getItem('currentLevel')}.html`;
+        //window.location.href = 'game.html';
+      }
+
+      // Function to toggle the controls overlay
+      function showControls() {
+        const overlay = document.getElementById('controls-overlay');
+        overlay.style.display = overlay.style.display === 'flex' ? 'none' : 'flex';
+      }
+
+      // Enable resume button if currentLevel is not equal to 1
+      const currentLevel = localStorage.getItem('currentLevel');
+      const resumeButton = document.getElementById('resumeButton');
+      if (currentLevel !== 1 && currentLevel !== null) {
+        resumeButton.disabled = false;
+      }
+    </script>
   </body>
 </html>
