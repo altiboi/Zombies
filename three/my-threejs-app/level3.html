@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zombie Camp Cutscene</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #000;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    #cutscene {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      text-align: center;
+    }
+
+    .scene {
+      position: absolute;
+      opacity: 0;
+      transition: opacity 2s ease;
+    }
+
+    .scene.active {
+      opacity: 1;
+    }
+
+    #timer {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 24px;
+      color: red;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <!-- Background audio -->
+  <audio id="backgroundAudio" loop>
+    <source src="background-sound.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+
+  <div id="cutscene">
+    <div id="timer">60</div>
+    <div class="scene active">
+      <img src="camp_scene1.jpg" alt="Camp entrance, eerie silence" width="100%">
+      <p>You successfully saved your child from the clutches of the zombies!</p>
+    </div>
+    <div class="scene">
+      <img src="camp_scene2.jpg" alt="Holding your child tightly" width="100%">
+      <p>But the danger isn't over yet; a powerful boss zombie stands in your way.</p>
+    </div>
+    <div class="scene">
+      <img src="camp_scene3.jpg" alt="Boss zombie appearing" width="100%">
+      <p>To escape the camp, you must defeat this final boss zombie!</p>
+    </div>
+    <div class="scene">
+      <img src="camp_scene4.jpg" alt="Preparing for battle" width="100%">
+      <p>Time is running out. You have 60 seconds before the boss attacks!</p>
+    </div>
+    <div class="scene">
+      <img src="camp_scene5.jpg" alt="Fighting the boss zombie" width="100%">
+      <p>Are you ready to face the ultimate challenge and protect your child?</p>
+    </div>
+  </div>
+
+  <script>
+    const scenes = document.querySelectorAll('.scene');
+    const backgroundAudio = document.getElementById('backgroundAudio');
+    const timerDisplay = document.getElementById('timer');
+    let currentScene = 0;
+    let timeLeft = 15;
+
+    // Start background sound
+    backgroundAudio.play();
+
+    // Scene transition every 12 seconds
+    function showNextScene() {
+      if (currentScene < scenes.length - 1) {
+        scenes[currentScene].classList.remove('active');
+        currentScene++;
+        scenes[currentScene].classList.add('active');
+      } else {
+        clearInterval(sceneInterval);
+      }
+    }
+
+    // Start scene transitions and timer countdown
+    const sceneInterval = setInterval(showNextScene, 3000);
+
+    // Timer countdown logic
+    const timerInterval = setInterval(() => {
+      timeLeft--;
+      timerDisplay.textContent = timeLeft;
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        backgroundAudio.pause();
+        window.location.href = 'game.html'; // Redirect to game page after the cutscene
+      }
+    }, 1000);
+  </script>
+</body>
+</html>

@@ -8,7 +8,8 @@ import { gsap } from 'gsap/gsap-core';
 import Zombie from './zombies'
 import { initPlayerControls, initPlayerPhysics } from './player';
 import { world, bodyMeshMap } from './world';
-import { initGun, shootPaintball, updatePaintballs, gun } from './gun';
+import { initGun, shootPaintball, updatePaintballs, reloadGun, gun } from './gun';
+import CannonDebugger from 'cannon-es-debugger';
 //import { createTerrain } from './terrain';
 
 
@@ -18,6 +19,10 @@ const loadingManager = new THREE.LoadingManager(
     () => {
         // Hide loading screen when loading is complete
         document.getElementById('loading-screen').style.display = 'none';
+         Objective.innerHTML = `Objective: Kill ${zombiesToKill} zombies before the timer runs out.`
+        startTimer(100); // Start a 60-second timer
+        
+
     },
     (itemUrl, itemsLoaded, itemsTotal) => {
         // Update the progress bar
@@ -28,20 +33,111 @@ const loadingManager = new THREE.LoadingManager(
 
 let sun, moon, sunMesh, moonMesh,  sky, clouds, stars, terrainGeometry;
 let daySkyMaterial, nightSkyMaterial;
-let playerLife = 5; // Player starts with 5 life points
-let moveSpeed = 20;
+let playerLife = 10; // Player starts with 5 life points
+let moveSpeed = 10;
 let kills = 0;
-let currentLevel = 1;
+let currentLevel = localStorage.getItem('currentLevel') && localStorage.getItem('currentLevel') < 4?localStorage.getItem('currentLevel'):1; 
+let zombiesToKill = localStorage.getItem('zombiesToKill') ? localStorage.getItem('zombiesToKill') : 5;
 let isGameOver = false;
 let gameOverScreen;
 let isPaused = false; // Game pause state
 const pauseSign = document.getElementById('pauseSign');
 const playSign = document.getElementById('playSign');
+const Objective = document.getElementById('objective');
 
+if(localStorage.getItem('currentLevel')>=4){
+    localStorage.setItem('currentLevel',1)
+}
 
 const powerUps = []; // Array to store active power-ups
 const zombiesToRemove = [];
 
+//kill meter & level displayer
+const killCount = document.createElement('div');
+killCount.style.position = 'absolute';
+killCount.style.top = '50px'; // Positioned below the life bar
+killCount.style.right = '20px';
+killCount.style.width = '110px';
+killCount.style.height = '60px';
+killCount.style.color = 'yellow'; // Flashy retro color
+killCount.style.fontFamily = "'Press Start 2P', sans-serif"; // Blocky pixel font
+killCount.style.fontSize = '18px';
+killCount.style.textAlign = 'center';
+killCount.style.backgroundColor = 'black';
+killCount.style.border = '3px solid #888';
+killCount.style.boxShadow = '0 0 10px #000';
+killCount.style.padding = '5px';
+killCount.style.imageRendering = 'pixelated'; // Retro pixelated effect
+killCount.innerHTML = `Kills: 0<br>Level: 1`; // Initial kill count
+
+document.body.appendChild(killCount);
+
+function updateKillCount() {
+    killCount.innerHTML = `Kills: ${kills}<br style="display:none;>Level: ${currentLevel}`;
+}
+
+function updateLevel(){
+    currentLevel++;
+    zombiesToKill += 5;
+    localStorage.setItem('currentLevel', currentLevel);
+    localStorage.setItem('zombiesToKill', zombiesToKill);
+    window.location.href = `level${currentLevel}.html`;
+}
+
+
+function handleZombieDeath(zombie) {
+    kills += 1;
+    console.log("Zombies to kill: ", zombiesToKill)
+    updateKillCount();
+    if (kills == zombiesToKill && timeleft) {
+        updateLevel();
+    }
+    else if(kills == zombiesToKill + 5 && !timeleft){
+        updateLevel();
+    }
+}
+
+// Initialize timer variables
+let startTime = Date.now();
+let elapsedTime = 0;
+let timerInterval;
+
+// Create timer display
+const timerDisplay = document.createElement('div');
+timerDisplay.style.position = 'absolute';
+timerDisplay.style.top = '80px'; // Positioned below the kill meter
+timerDisplay.style.right = '20px';
+timerDisplay.style.width = '110px';
+timerDisplay.style.height = '60px';
+timerDisplay.style.color = 'yellow'; // Flashy retro color
+timerDisplay.style.fontFamily = "'Press Start 2P', sans-serif"; // Blocky pixel font
+timerDisplay.style.fontSize = '18px';
+timerDisplay.style.textAlign = 'center';
+timerDisplay.style.backgroundColor = 'black';
+timerDisplay.style.border = '3px solid #888';
+timerDisplay.style.boxShadow = '0 0 10px #000';
+timerDisplay.style.padding = '5px';
+timerDisplay.innerHTML = 'Time: 0s'; // Initialize timer display
+
+document.body.appendChild(timerDisplay);
+
+// Function to start the timer
+function startTimer(duration) {
+    let timeRemaining = duration;
+
+    timerInterval = setInterval(() => {
+        if (timeRemaining <= 0) {
+            clearInterval(timerInterval);
+            timeleft = false
+            timerDisplay.innerHTML = 'Time is up!';
+            Objective.innerHTML = `Objective: Kill ${zombiesToKill+5} Zombies`
+
+        } else {
+            timerDisplay.innerHTML = `Time Remaining: ${timeRemaining} seconds`;
+            timeRemaining--;
+        }
+    }, 1000);
+}
 
 function pauseGame() {
     isPaused = true; // Set the pause state to true
@@ -80,13 +176,8 @@ class PowerUp {
         this.position = position;
         this.isActive = true;
         this.scene = scene
-
-        
         this.mesh =null;
         this.loadModel(loadPowerUp);
-      
-
-       
     }
 
     loadModel(loader) {
@@ -159,7 +250,7 @@ class PowerUp {
                 console.log('Player speed increased!');
                 break;
             case powerUpTypes.HEALTH_BOOST:
-                playerLife = Math.min(playerLife + 1, 5); // Heal player, max life is 5
+                playerLife = Math.min(playerLife + 2.5, 10); // Heal player, max life is 5
                 console.log('Player health boosted!');
                 updateLifeBar()
                 break;
@@ -176,14 +267,11 @@ class PowerUp {
 
 }
 
-
-
-
 // Set up the scene, camera, and renderer
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight , 0.1, 1000);
-camera.position.set(0, 5, 0);
+camera.position.set(0, 3, 0);
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true; // Enable shadows
@@ -191,22 +279,38 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Use soft shadows
 document.body.appendChild(renderer.domElement);
 let zombieSpeed = 2; // Speed at which the zombie runs
 let minimumDistance = 1.5; // Distance at which the zombie stops running and can punch
-const width=800;
-const length = 800;
+const width=600;
+const length = 600;
 const zombies = [];
 const obstacles = [];
 const loader = new FBXLoader(loadingManager); 
 const loadPowerUp = new GLTFLoader(loadingManager); 
+let cannonDebugger;
+let timeleft = true;
 
+
+createTerrain(); 
 const controls = initPlayerControls(camera, scene);
 const characterBody = initPlayerPhysics(world);
+placePlayerNearCenter(characterBody, 1);
 initGun(zombies, bodyMeshMap, renderer, camera).then(() => {
     document.addEventListener('mousedown', onShoot);
 });
+addSun();
+addMoon();
+addSky();
+addClouds();
+addStars();
 
 function onShoot(){
-    shootPaintball(world, scene, camera);
+    shootPaintball(world, scene, camera, handleZombieDeath);
 }
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'r') {
+        reloadGun();
+    }
+});
 
 const MalescreamSound = new Audio('./assets/audio/scream.mp3'); // Replace with your audio file path
 MalescreamSound.volume = 0.5; // Set volume to 70%
@@ -215,6 +319,8 @@ const forestSound = new Audio('./assets/audio/forest.mp3'); // Replace with your
 forestSound.loop = true; // Loop the sound for continuous play
 forestSound.volume = 0.4; // Set volume to 70%
 
+const Endmusic = new Audio('./assets/audio/gameover.mp3');
+Endmusic.volume = 0.5; // Set volume to 70%
 
 // Function to start playing the background sound
 function startBackgroundSound() {
@@ -222,22 +328,11 @@ function startBackgroundSound() {
         console.error("Error playing forest sound:", error);
     });
 }
+startBackgroundSound();
 
-characterBody.addEventListener('collide', (event) => {
-    const contact = event.contact;
-    const otherBody = event.body; // The other body involved in the collision
-    if(otherBody !== worldTerrain)
-    {
-        
-        console.log('Player collided with:', otherBody);
-        if (bodyMeshMap.has(otherBody)) {
-            const mesh = bodyMeshMap.get(otherBody);
-            console.log('Player collided with a tree:', mesh.name);
-        }
-    }
-});
+cannonDebugger = new CannonDebugger(scene, world, {color: 0x00ff00});
 
-//MINIMAP SECTION
+// MINIMAP SECTION
 const minimapCanvas = document.createElement('canvas');
 minimapCanvas.width = 200;
 minimapCanvas.height = 200;
@@ -262,10 +357,10 @@ function updateMinimap() {
 
   // Draw the terrain outline
   minimapContext.beginPath();
-  minimapContext.moveTo(-width / 2, -length / 2);
-  minimapContext.lineTo(-width / 2, length / 2);
-  minimapContext.lineTo(width / 2, length / 2);
-  minimapContext.lineTo(width / 2, -length / 2);
+  minimapContext.moveTo(0, 0);
+  minimapContext.lineTo(0, minimapCanvas.height);
+  minimapContext.lineTo(minimapCanvas.width, minimapCanvas.height);
+  minimapContext.lineTo(minimapCanvas.width, 0);
   minimapContext.closePath();
   minimapContext.strokeStyle = 'white';
   minimapContext.stroke();
@@ -285,20 +380,30 @@ function updateMinimap() {
     }
   });
 
-  // Draw the player marker
-  const { x, y } = worldToMinimap(
-    controls.object.position.x,
-    controls.object.position.z
-  );
-  minimapContext.save();
-  minimapContext.translate(x, y);
-  minimapContext.rotate(-controls.object.rotation.y);
-  minimapContext.beginPath();
-  minimapContext.moveTo(0, 0);
-  minimapContext.lineTo(10 * Math.cos(Math.PI / 4), 10 * Math.sin(Math.PI / 4));
-  minimapContext.lineTo(10 * Math.cos(3 * Math.PI / 4), 10 * Math.sin(3 * Math.PI / 4));
-  minimapContext.closePath();
+  // Draw the zombies
   minimapContext.fillStyle = 'red';
+  zombies.forEach(zombie => {
+    if(zombie.model){
+        const { x, y } = worldToMinimap(zombie.model.position.x, zombie.model.position.z);
+        minimapContext.beginPath();
+        minimapContext.arc(x, y, 1.5, 0, 2 * Math.PI);
+        minimapContext.fill();
+    }
+  });
+
+  // Draw the player marker
+  const playerPos = worldToMinimap(controls.object.position.x, controls.object.position.z);
+  minimapContext.save();
+  minimapContext.translate(playerPos.x, playerPos.y);
+  const euler = new THREE.Euler();
+  euler.setFromQuaternion(controls.object.quaternion);
+  minimapContext.rotate(-euler.y);
+  minimapContext.beginPath();
+  minimapContext.moveTo(0, -5); // Tip of the arrow
+  minimapContext.lineTo(2.5, 5); // Bottom right of the arrow
+  minimapContext.lineTo(-2.5, 5); // Bottom left of the arrow
+  minimapContext.closePath();
+  minimapContext.fillStyle = 'blue';
   minimapContext.fill();
   minimapContext.restore();
 }
@@ -324,56 +429,24 @@ lifeBar.style.transition = 'width 0.3s'; // Smooth transition when life changes
 lifeBarContainer.appendChild(lifeBar);
 document.body.appendChild(lifeBarContainer);
 
-//kill meter & level displayer
-const killCount = document.createElement('div');
-killCount.style.position = 'absolute';
-killCount.style.top = '50px'; // Positioned below the life bar
-killCount.style.right = '20px';
-killCount.style.width = '110px';
-killCount.style.height = '60px';
-killCount.style.color = 'yellow'; // Flashy retro color
-killCount.style.fontFamily = "'Press Start 2P', sans-serif"; // Blocky pixel font
-killCount.style.fontSize = '18px';
-killCount.style.textAlign = 'center';
-killCount.style.backgroundColor = 'black';
-killCount.style.border = '3px solid #888';
-killCount.style.boxShadow = '0 0 10px #000';
-killCount.style.padding = '5px';
-killCount.style.imageRendering = 'pixelated'; // Retro pixelated effect
-killCount.innerHTML = `Kills: 0<br>Level: 1`; // Initial kill count
-
-document.body.appendChild(killCount);
-
-function updateKillCount() {
-    kills += 1;
-    killCount.innerHTML = `Kills: ${kills}<br style="display:none;>Level: ${currentLevel}`;
-
-}
-
-function updateLevel(){
-    currentLevel++
-    killCount.innerHTML = `Kills: ${kills}<br style="display:none;>Level: ${currentLevel}`;
-
-}
-
 // Update life bar based on player's current life
 function updateLifeBar() {
-    const lifePercentage = (playerLife / 5) * 100; // Convert to percentage
+    const lifePercentage = (playerLife / 10) * 100; // Convert to percentage
     lifeBar.style.width = `${lifePercentage}%`; // Adjust based on life percentage
 
-    if (lifePercentage <= 50) {
+
+    if (lifePercentage <= 50 && lifePercentage > 20) {
         lifeBar.style.backgroundColor = 'yellow'; // Change color when life is low
-        
-        MalescreamSound.pause();
-        MalescreamSound.currentTime = 0;
-        
     }
-    if (lifePercentage <= 30) {
+    else if (lifePercentage <= 20) {
         lifeBar.style.backgroundColor = 'red'; // Critical life level
         MalescreamSound.play().catch(error => {
             console.error("Error playing scream sound:", error);
         });
         
+    }else if(lifePercentage > 20){
+        MalescreamSound.pause();
+        MalescreamSound.currentTime = 0;
     }
 }
 
@@ -414,7 +487,10 @@ function checkGameOver() {
         playerLife = 0;
         updateLifeBar();
         showGameOverScreen();
-
+        Endmusic.play().catch(error => {
+            console.error("Error playing end sound:", error);
+        });
+        Endmusic.currentTime = 26;
         forestSound.pause();
         forestSound.currentTime = 0;
     }
@@ -426,25 +502,13 @@ function showGameOverScreen() {
 }
 
 function restartGame() {
-    
-        window.location.reload();
-  
+    localStorage.setItem('currentLevel', 1);
+    localStorage.setItem('zombiesToKill', 5);
+    window.location.reload();
 }
 
-
-
-
-
-addSun();
-addMoon();
-addSky();
-addClouds();
-addStars();
-createTerrain();   
-       
-
 function addZombies(playerPosition) {
-    const zombieCount = width * 0.01 * currentLevel; // Adjust based on desired density
+    const zombieCount = width * 0.02 * currentLevel; // Adjust based on desired density
     const maxAttempts = zombieCount * 10; // Maximum attempts to find valid positions
     let placedZombies = 0;
     let attempts = 0;
@@ -462,18 +526,14 @@ function addZombies(playerPosition) {
             continue; // Skip this iteration if the zombie is too close to the player
         }
 
-        // Define the dimensions for the zombie bounding box
-        const zombieWidth = 2; // Adjust as needed
-        const zombieDepth = 2; // Adjust as needed
-
         // Check if the space is clear for the zombie
-        if (!isSpaceClear(x, z, zombieWidth, zombieDepth)) {
+        if (!isPositionClear(x, z, 2)) {
             continue; // Skip this iteration if the space is not clear
         }
 
         // Create the zombie using the createZombie function
-        new Zombie(loader, scene, zombies, world, characterBody);
-
+        const zombie = new Zombie(loader, scene, zombies, world);
+        zombies.push(zombie);
         // Increment the count of placed zombies
         placedZombies++;
     }
@@ -483,131 +543,53 @@ function addZombies(playerPosition) {
     }
 }
 
-// Ensure that the isSpaceClear function is accessible
-function isSpaceClear(x, z, structureWidth, depth) {
-    const margin = 1; // Margin for the zombie bounding box
+// Function to check if a position is clear of collisions
+function isPositionClear(x, z, radius) {
     const checkBox = new THREE.Box3(
-        new THREE.Vector3(x - structureWidth / 2 - margin, 0, z - depth / 2 - margin),
-        new THREE.Vector3(x + structureWidth / 2 + margin, 100, z + depth / 2 + margin)
+        new THREE.Vector3(x - radius, 0, z - radius),
+        new THREE.Vector3(x + radius, 0, z + radius)
     );
 
-    // Check against existing obstacles
-    for (let obstacle of obstacles) {
-        if (checkBox.intersectsBox(obstacle.boundingBox)) {
-            return false; // Space is not clear
+    // Check against existing physics bodies
+    for (let body of world.bodies) {
+        if (body.shapes.length > 0) {
+            const shape = body.shapes[0];
+            if (shape instanceof CANNON.Box || shape instanceof CANNON.Cylinder || shape instanceof CANNON.Sphere) {
+                const halfExtents = shape.halfExtents || new CANNON.Vec3(shape.radiusTop || shape.radius, shape.height / 2 || shape.radius, shape.radiusTop || shape.radius);
+                const bodyBox = new THREE.Box3(
+                    new THREE.Vector3(body.position.x - halfExtents.x, body.position.y - halfExtents.y, body.position.z - halfExtents.z),
+                    new THREE.Vector3(body.position.x + halfExtents.x, body.position.y + halfExtents.y, body.position.z + halfExtents.z)
+                );
+                if (checkBox.intersectsBox(bodyBox)) {
+                    return false;
+                }
+            }
         }
     }
 
-    return true; // Space is clear
+    return true;
 }
 
-addZombies(controls.object.position);
-    
+// Function to place the player near the center of the map
+function placePlayerNearCenter(playerBody, radius) {
+    const maxAttempts = 100;
+    let attempts = 0;
+    let x, z;
 
-function createWall() {
-    const textureLoader = new THREE.TextureLoader();
+    do {
+        x = (Math.random() - 0.5) * width * 0.2; // Random position within 20% of the map width around the center
+        z = (Math.random() - 0.5) * length * 0.2; // Random position within 20% of the map length around the center
+        attempts++;
+    } while (!isPositionClear(x, z, radius) && attempts < maxAttempts);
 
-    // Load wall bump map
-    const wallBumpMap = textureLoader.load('wallbumpmap.jpg');
-
-    // Configure the bump map so it doesn't tile too many times
-    wallBumpMap.wrapS = wallBumpMap.wrapT = THREE.RepeatWrapping;
-    wallBumpMap.repeat.set(1, 1); // Adjust this value to maintain the original aspect ratio
-
-    // Define the geometry and material for the walls
-    const wallGeometry = new THREE.BoxGeometry(width, 30, 1);
-
-    // Use MeshPhongMaterial to support bump mapping
-    const wallMaterial = new THREE.MeshPhongMaterial({
-        color: 0x8B4513,  // A brown color for the walls
-        bumpMap: wallBumpMap,
-        bumpScale: 0.5,   // Adjust this value to control the intensity of the bump effect
-        shininess: 10     // Adjust for desired shininess
-    });
-
-    // Function to create a wall and add it to the scene and physics world
-    function createWallMeshAndBody(position, rotation = 0, width, height, depth) {
-        const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), wallMaterial);
-        wallMesh.position.copy(position);
-        wallMesh.rotation.y = rotation;
-        wallMesh.castShadow = true;
-        wallMesh.receiveShadow = true;
-        scene.add(wallMesh);
-
-        const wallShape = new CANNON.Box(new CANNON.Vec3(width / 2, height / 2, depth / 2)); // Adjust size as needed
-        const wallBody = new CANNON.Body({ mass: 0 }); // Static body
-        wallBody.addShape(wallShape);
-        wallBody.position.copy(position);
-        wallBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), rotation);
-        world.addBody(wallBody);
-
-        // Map the body to the mesh
-        bodyMeshMap.set(wallBody, wallMesh);
+    if (attempts >= maxAttempts) {
+        console.warn('Could not find a clear position for the player near the center.');
     }
 
-    // Create front wall
-    createWallMeshAndBody(new THREE.Vector3(0, 15, -width / 2), 0, width, 30, 1);
-
-    // Create back wall
-    createWallMeshAndBody(new THREE.Vector3(0, 15, width / 2), 0, width, 30, 1);
-
-    // Create left wall
-    createWallMeshAndBody(new THREE.Vector3(-width / 2, 15, 0), Math.PI / 2, length, 30, 1);
-
-    // Create right wall
-    createWallMeshAndBody(new THREE.Vector3(width / 2, 15, 0), Math.PI / 2, length, 30, 1);
+    playerBody.position.set(x, 3, z); // Set the player's position
 }
 
-let worldTerrain;
-function createTerrain() {
-    const terrainWidth = width;
-    const terrainLength = length;
-
-    // Load the ground texture
-    const loader = new THREE.TextureLoader();
-    loader.load('ground.jpg', (groundTexture) => {
-        // Repeat the texture over the terrain
-        groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
-        groundTexture.repeat.set(terrainWidth / 10, terrainLength / 10); // Adjust the repeat to fit the terrain size
-
-        // Create the geometry
-        const terrainGeometry = new THREE.PlaneGeometry(terrainWidth, terrainLength);
-
-        // Create the material for the terrain using the ground texture
-        const terrainMaterial = new THREE.MeshLambertMaterial({
-            map: groundTexture,  // Apply the ground texture
-            wireframe: false     // Set to true if you want to see the mesh structure
-        });
-
-        // Create the terrain mesh
-        const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
-        terrain.rotation.x = -Math.PI / 2; // Rotate to lay flat
-        terrain.receiveShadow = true;      // Allow the terrain to receive shadows
-
-        // Add the terrain to the scene
-        scene.add(terrain);
-
-        // Create the Trimesh shape for Cannon.js
-        const terrainShape = new CANNON.Plane();
-
-        // Create the terrain body for Cannon.js
-        const terrainBody = new CANNON.Body({ mass: 0 }); // Mass = 0 for static ground
-        terrainBody.addShape(terrainShape);
-        
-        // Set the position and rotation to match the Three.js terrain
-        terrainBody.position.set(0, 0, 0);
-        terrainBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
-
-        // Add the terrain body to the world
-        world.addBody(terrainBody);
-        worldTerrain = terrainBody;
-
-        // Optionally, create walls around the terrain
-        createWall(terrainGeometry);
-        addTrees();
-        addStructures();
-    });
-}
+addZombies(characterBody.position);
 
 
     function addSun() {
@@ -643,8 +625,9 @@ function createTerrain() {
     function animateSun() {
             const time = Date.now() * 0.001;
             const radius = 700;
-            sunMesh.position.x = Math.cos(time * 0.1) * radius;
-            sunMesh.position.y = Math.sin(time * 0.1) * radius;
+            const daySpeed = 0.02;
+            sunMesh.position.x = Math.cos(time * daySpeed) * radius;
+            sunMesh.position.y = Math.sin(time * daySpeed) * radius;
 
             // Update directional light position
             sun.position.copy(sunMesh.position);
@@ -692,8 +675,9 @@ function createTerrain() {
     function animateMoon() {
         const time = Date.now() * 0.001;
         const radius = 700;
-        moonMesh.position.x = Math.cos(time * 0.1 + Math.PI) * radius; // Moon follows opposite direction of sun
-        moonMesh.position.y = Math.sin(time * 0.1 + Math.PI) * radius;
+        const nightSpeed = 0.02;
+        moonMesh.position.x = Math.cos(time * nightSpeed + Math.PI) * radius; // Moon follows opposite direction of sun
+        moonMesh.position.y = Math.sin(time * nightSpeed + Math.PI) * radius;
 
         // Update moon directional light position
         moon.position.copy(moonMesh.position);
@@ -711,21 +695,57 @@ function createTerrain() {
     }
 
     function addClouds() {
-      clouds = new THREE.Group();
-      const cloudGeometry = new THREE.SphereGeometry(5, 8, 8);
-      const cloudMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.8 });
-
-      for (let i = 0; i < 100; i++) {
-        const cloudPart = new THREE.Mesh(cloudGeometry, cloudMaterial);
-        cloudPart.position.set(
-          Math.random() * 800 - 400,
-          Math.random() * 100 + 200,
-          Math.random() * 800 - 400
-        );
-        cloudPart.scale.set(Math.random() * 2 + 1, Math.random() * 2 + 1, Math.random() * 2 + 1);
-        clouds.add(cloudPart);
-      }
-      scene.add(clouds);
+        clouds = new THREE.Group();
+        const loader = new GLTFLoader();
+        const cloudModelPath = './cloud.glb';
+        const cloudCount = 19;
+    
+        loader.load(cloudModelPath, (gltf) => {
+            const cloudModel = gltf.scene;
+    
+            // Set up materials for the original model
+            cloudModel.traverse((child) => {
+                if (child.isMesh) {
+                    // Create a completely new material instead of cloning
+                    const newMaterial = new THREE.MeshStandardMaterial({
+                        color: 0xFFFFFF,
+                        transparent: true,
+                        opacity: 0.2,
+                        emissive: 0xFFFFFF,
+                        emissiveIntensity: 0.2,
+                        roughness: 0.1,
+                        metalness: 0,
+                    });
+                    child.material = newMaterial;
+                }
+            });
+    
+            // Create multiple cloud instances
+            for (let i = 0; i < cloudCount; i++) {
+                const cloudPart = cloudModel.clone();
+                cloudPart.position.set(
+                    Math.random() * 1300-100 ,
+                    Math.random() * 500 +300,
+                    Math.random() * 1800 -300
+                );
+    
+                const scaleFactor = Math.random() * 55 + 4;
+                cloudPart.scale.set(scaleFactor, scaleFactor, scaleFactor);
+    
+                // Ensure each instance has its own material
+                cloudPart.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material = child.material.clone();
+                    }
+                });
+    
+                clouds.add(cloudPart);
+            }
+    
+            scene.add(clouds);
+        }, undefined, (error) => {
+            console.error('An error occurred while loading the GLB model:', error);
+        });
     }
 
     function addStars() {
@@ -746,51 +766,164 @@ function createTerrain() {
     }
 
     function updateSkyColor() {
-      const dayColor = new THREE.Color(0x87CEEB); // Blue sky
-      const nightColor = new THREE.Color(0x192841); // Dark night sky
-      const sunsetColor = new THREE.Color(0xFFA500); // Orange for sunset
-
-      let t = (sunMesh.position.y + 700) / 1400; // Normalize sun position to [0, 1]
-      t = Math.max(0, Math.min(1, t)); // Clamp to [0, 1]
-
-      let skyColor;
-      if (t > 0.7) {
-        skyColor = dayColor;
-        clouds.visible = true;
-        stars.visible = false;
-      } else if (t > 0.4) {
-        skyColor = dayColor.lerp(sunsetColor, (t - 0.4) * (1 / 0.3));
-        clouds.visible = true;
-        stars.visible = false;
-      } else if (t > 0.2) {
-        skyColor = sunsetColor.lerp(nightColor, (t - 0.2) * (1 / 0.2));
-        clouds.visible = false;
-        stars.visible = true;
-      } else {
-        skyColor = nightColor;
-        clouds.visible = false;
-        stars.visible = true;
+        const dayColor = new THREE.Color(0x87CEEB); // Blue sky
+        const nightColor = new THREE.Color(0x192841); // Dark night sky
+        const sunsetColor = new THREE.Color(0xFFA500); // Orange for sunset
+  
+        let t = (sunMesh.position.y + 700) / 1400; // Normalize sun position to [0, 1]
+        t = Math.max(0, Math.min(1, t)); // Clamp to [0, 1]
+  
+        let skyColor;
+        if (t > 0.7) {
+          skyColor = dayColor;
+          clouds.visible = true;
+          stars.visible = false;
+        } else if (t > 0.4) {
+          skyColor = dayColor.lerp(sunsetColor, (t - 0.4) * (1 / 0.3));
+          clouds.visible = true;
+          stars.visible = false;
+        } else if (t > 0.2) {
+          skyColor = sunsetColor.lerp(nightColor, (t - 0.2) * (1 / 0.2));
+          clouds.visible = false;
+          stars.visible = true;
+        } else {
+          skyColor = nightColor;
+          clouds.visible = false;
+          stars.visible = true;
+        }
+  
+        sky.material.color.copy(skyColor);
+  
+        // Adjust cloud opacity based on time of day
+        if (clouds && clouds.visible) {
+          const cloudOpacity = Math.min(1, Math.max(0, (t - 0.4) * 2));
+          clouds.children.forEach(cloudPart => {
+              // Traverse through all meshes in the cloud part
+              cloudPart.traverse((child) => {
+                  if (child.isMesh && child.material) {
+                      if (!child.material.transparent) {
+                          child.material = child.material.clone(); // Clone the material if it hasn't been yet
+                          child.material.transparent = true;
+                      }
+                      child.material.opacity = cloudOpacity * 0.2;
+                  }
+              });
+          });
       }
-
-      sky.material.color.copy(skyColor);
-
-      // Adjust cloud opacity based on time of day
-      if (clouds.visible) {
-        const cloudOpacity = Math.min(1, Math.max(0, (t - 0.4) * 2));
-        clouds.children.forEach(cloud => {
-          cloud.material.opacity = cloudOpacity * 0.8;
-        });
-      }
-
-      // Adjust star brightness based on time of day
-      if (stars.visible) {
-        const starBrightness = Math.min(1, Math.max(0, (0.4 - t) * 2));
-        stars.children.forEach(star => {
-          star.material.opacity = starBrightness;
-        });
-      }
+  
+        // Adjust star brightness based on time of day
+        if (stars.visible) {
+          const starBrightness = Math.min(1, Math.max(0, (0.4 - t) * 2));
+          stars.children.forEach(star => {
+            star.material.opacity = starBrightness;
+          });
+        }
     }
 
+    function createWall() {
+        const textureLoader = new THREE.TextureLoader();
+    
+        // Load wall bump map
+        const wallBumpMap = textureLoader.load('wallbumpmap.jpg');
+    
+        // Configure the bump map so it doesn't tile too many times
+        wallBumpMap.wrapS = wallBumpMap.wrapT = THREE.RepeatWrapping;
+        wallBumpMap.repeat.set(1, 1); // Adjust this value to maintain the original aspect ratio
+    
+        // Define the geometry and material for the walls
+        const wallGeometry = new THREE.BoxGeometry(width, 30, 1);
+    
+        // Use MeshPhongMaterial to support bump mapping
+        const wallMaterial = new THREE.MeshPhongMaterial({
+            color: 0x8B4513,  // A brown color for the walls
+            bumpMap: wallBumpMap,
+            bumpScale: 0.5,   // Adjust this value to control the intensity of the bump effect
+            shininess: 10     // Adjust for desired shininess
+        });
+    
+        // Function to create a wall and add it to the scene and physics world
+        function createWallMeshAndBody(position, rotation = 0, width, height, depth) {
+            const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), wallMaterial);
+            wallMesh.position.copy(position);
+            wallMesh.rotation.y = rotation;
+            wallMesh.castShadow = true;
+            wallMesh.receiveShadow = true;
+            scene.add(wallMesh);
+    
+            const wallShape = new CANNON.Box(new CANNON.Vec3(width / 2, height / 2, depth / 2)); // Adjust size as needed
+            const wallBody = new CANNON.Body({ mass: 0 }); // Static body
+            wallBody.addShape(wallShape);
+            wallBody.position.copy(position);
+            wallBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), rotation);
+            world.addBody(wallBody);
+    
+            // Map the body to the mesh
+            bodyMeshMap.set(wallBody, wallMesh);
+        }
+    
+        // Create front wall
+        createWallMeshAndBody(new THREE.Vector3(0, 15, -width / 2), 0, width, 30, 1);
+    
+        // Create back wall
+        createWallMeshAndBody(new THREE.Vector3(0, 15, width / 2), 0, width, 30, 1);
+    
+        // Create left wall
+        createWallMeshAndBody(new THREE.Vector3(-width / 2, 15, 0), Math.PI / 2, length, 30, 1);
+    
+        // Create right wall
+        createWallMeshAndBody(new THREE.Vector3(width / 2, 15, 0), Math.PI / 2, length, 30, 1);
+    }
+    
+    let worldTerrain;
+    function createTerrain() {
+        const terrainWidth = width;
+        const terrainLength = length;
+    
+        // Load the ground texture
+        const loader = new THREE.TextureLoader();
+        loader.load('ground.jpg', (groundTexture) => {
+            // Repeat the texture over the terrain
+            groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
+            groundTexture.repeat.set(terrainWidth / 10, terrainLength / 10); // Adjust the repeat to fit the terrain size
+    
+            // Create the geometry
+            const terrainGeometry = new THREE.PlaneGeometry(terrainWidth, terrainLength);
+    
+            // Create the material for the terrain using the ground texture
+            const terrainMaterial = new THREE.MeshLambertMaterial({
+                map: groundTexture,  // Apply the ground texture
+                wireframe: false     // Set to true if you want to see the mesh structure
+            });
+    
+            // Create the terrain mesh
+            const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
+            terrain.rotation.x = -Math.PI / 2; // Rotate to lay flat
+            terrain.receiveShadow = true;      // Allow the terrain to receive shadows
+    
+            // Add the terrain to the scene
+            scene.add(terrain);
+    
+            // Create the Trimesh shape for Cannon.js
+            const terrainShape = new CANNON.Plane();
+    
+            // Create the terrain body for Cannon.js
+            const terrainBody = new CANNON.Body({ mass: 0 }); // Mass = 0 for static ground
+            terrainBody.addShape(terrainShape);
+            
+            // Set the position and rotation to match the Three.js terrain
+            terrainBody.position.set(0, 0, 0);
+            terrainBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+    
+            // Add the terrain body to the world
+            world.addBody(terrainBody);
+            worldTerrain = terrainBody;
+    
+            // Optionally, create walls around the terrain
+            createWall();
+            addTrees();
+            addStructures();
+        });
+    }
 
 
     function addTrees() {
@@ -801,19 +934,49 @@ function createTerrain() {
         const barkBumpMap = textureLoader.load('treebark.jpg');
         const leafTexture = textureLoader.load('leaves.avif');
     
+        // Define grid size
+        const gridSize = Math.sqrt((width * length) / treeCount);
+        const grid = {};
+    
         for (let i = 0; i < treeCount; i++) {
-            const x = Math.random() * width - width / 2;
-            const z = Math.random() * width - width / 2;
-            
+            let x, z;
+            let attempts = 0;
+            const maxAttempts = 10;
+    
+            do {
+                // Calculate grid cell
+                const gridX = Math.floor(Math.random() * (width / gridSize));
+                const gridZ = Math.floor(Math.random() * (length / gridSize));
+    
+                // Calculate random position within the grid cell
+                x = (gridX * gridSize) + (Math.random() * gridSize) - (width / 2);
+                z = (gridZ * gridSize) + (Math.random() * gridSize) - (length / 2);
+    
+                // Check for overlap
+                const key = `${gridX},${gridZ}`;
+                if (!grid[key]) {
+                    grid[key] = true;
+                    break;
+                }
+    
+                attempts++;
+            } while (attempts < maxAttempts);
+    
+            if (attempts >= maxAttempts) {
+                console.log('Max attempts reached, could not place all trees.');
+                break;
+            }
+    
             // Randomize tree sizes
             const trunkHeight = 25 + Math.random() * 20;
             const trunkRadius = 2.5 + Math.random() * 3.5;
     
             // Create a physics body for the tree trunk
-            const trunkShape = new CANNON.Cylinder(trunkRadius, trunkRadius * 1.2, trunkHeight, 16);
-            const trunkBody = new CANNON.Body({ mass: 0, position: new CANNON.Vec3(x, trunkHeight/2, z)}); // Static body
+            const trunkShape = new CANNON.Cylinder(trunkRadius, trunkRadius * 1.25, trunkHeight * 1.05, 16);
+            const trunkBody = new CANNON.Body({ mass: 0, position: new CANNON.Vec3(x, trunkHeight / 2, z) }); // Static body
             trunkBody.addShape(trunkShape);
             world.addBody(trunkBody);
+            trunkBody.userData = { type: 'tree' };
     
             // Create the tree trunk with bump map
             const trunkGeometry = new THREE.CylinderGeometry(trunkRadius, trunkRadius * 1.2, trunkHeight, 16);
@@ -828,6 +991,8 @@ function createTerrain() {
             trunk.castShadow = true;
             trunk.receiveShadow = true;
             scene.add(trunk);
+    
+            bodyMeshMap.set(trunkBody, trunk);
     
             // Create low-poly tree leaves
             const leavesGroup = new THREE.Group();
@@ -909,7 +1074,7 @@ function createTerrain() {
                 new THREE.Vector3(x - structureWidth / 2 - margin, 0, z - depth / 2 - margin),
                 new THREE.Vector3(x + structureWidth / 2 + margin, 100, z + depth / 2 + margin)
             );
-        
+    
             // Check against existing physics bodies
             for (let body of world.bodies) {
                 if (body.shapes.length > 0) {
@@ -926,7 +1091,18 @@ function createTerrain() {
                     }
                 }
             }
-        
+    
+            // Check against trees
+            for (let body of world.bodies) {
+                if (body.userData && body.userData.type === 'tree') {
+                    const treeRadius = body.shapes[0].radiusTop || body.shapes[0].radius;
+                    const distance = Math.sqrt(Math.pow(body.position.x - x, 2) + Math.pow(body.position.z - z, 2));
+                    if (distance < treeRadius + margin) {
+                        return false;
+                    }
+                }
+            }
+    
             return true;
         }
     
@@ -1001,58 +1177,66 @@ function createTerrain() {
             // Final structure positioning
             structureGroup.position.set(x, 0, z); // Place structures directly on the flat terrain
             scene.add(structureGroup); // Add the structure group to the scene
-    
+            
+            const offset = 1.1;
             // Create physics bodies for each wall
-            const leftWallShape = new CANNON.Box(new CANNON.Vec3(wallThickness / 2, height / 2, depth / 2));
-            const rightWallShape = new CANNON.Box(new CANNON.Vec3(wallThickness / 2, height / 2, depth / 2));
-            const backWallShape = new CANNON.Box(new CANNON.Vec3(structureWidth / 2, height / 2, wallThickness / 2));
-            const frontWallTopShape = new CANNON.Box(new CANNON.Vec3(structureWidth / 2, (height - openingHeight) / 2, wallThickness / 2));
-            const frontWallSideShape = new CANNON.Box(new CANNON.Vec3((structureWidth - openingWidth) / 4, openingHeight / 2, wallThickness / 2));
-            const roofShape = new CANNON.Box(new CANNON.Vec3(structureWidth / 2, 0.5, depth / 2));
+            const leftWallShape = new CANNON.Box(new CANNON.Vec3(wallThickness / 2 * offset, height / 2 * offset, depth / 2 * offset));
+            const rightWallShape = new CANNON.Box(new CANNON.Vec3(wallThickness / 2 * offset, height / 2 * offset, depth / 2 * offset));
+            const backWallShape = new CANNON.Box(new CANNON.Vec3(structureWidth / 2 * offset, height / 2 * offset, wallThickness / 2 * offset));
+            const frontWallTopShape = new CANNON.Box(new CANNON.Vec3(structureWidth / 2 * offset, (height - openingHeight) / 2 * offset, wallThickness / 2 * offset));
+            const frontWallSideShape = new CANNON.Box(new CANNON.Vec3((structureWidth - openingWidth) / 4 * offset, openingHeight / 2 * offset, wallThickness / 2 * offset));
+            const roofShape = new CANNON.Box(new CANNON.Vec3(structureWidth / 2 * offset, 0.5 * offset, depth / 2 * offset));
     
             const leftWallBody = new CANNON.Body({ mass: 0 });
             leftWallBody.addShape(leftWallShape);
             leftWallBody.position.set(x - structureWidth / 2, height / 2, z);
             world.addBody(leftWallBody);
+            leftWallBody.userData = {type: 'building'};
     
             const rightWallBody = new CANNON.Body({ mass: 0 });
             rightWallBody.addShape(rightWallShape);
             rightWallBody.position.set(x + structureWidth / 2, height / 2, z);
             world.addBody(rightWallBody);
+            rightWallBody.userData = {type: 'building'};
     
             const backWallBody = new CANNON.Body({ mass: 0 });
             backWallBody.addShape(backWallShape);
             backWallBody.position.set(x, height / 2, z - depth / 2 + wallThickness / 2);
             world.addBody(backWallBody);
+            backWallBody.userData = {type: 'building'};
     
             const frontWallTopBody = new CANNON.Body({ mass: 0 });
             frontWallTopBody.addShape(frontWallTopShape);
             frontWallTopBody.position.set(x, height / 2 + openingHeight / 2, z + depth / 2 - wallThickness / 2);
             world.addBody(frontWallTopBody);
+            frontWallTopBody.userData = {type: 'building'};
     
             const frontWallLeftBody = new CANNON.Body({ mass: 0 });
             frontWallLeftBody.addShape(frontWallSideShape);
             frontWallLeftBody.position.set(x - structureWidth / 4 - openingWidth / 4, openingHeight / 2, z + depth / 2 - wallThickness / 2);
             world.addBody(frontWallLeftBody);
+            frontWallLeftBody.userData = {type: 'building'};
     
             const frontWallRightBody = new CANNON.Body({ mass: 0 });
             frontWallRightBody.addShape(frontWallSideShape);
             frontWallRightBody.position.set(x + structureWidth / 4 + openingWidth / 4, openingHeight / 2, z + depth / 2 - wallThickness / 2);
             world.addBody(frontWallRightBody);
+            frontWallRightBody.userData = {type: 'building'};
     
             const roofBody = new CANNON.Body({ mass: 0 });
             roofBody.addShape(roofShape);
             roofBody.position.set(x, height - 0.5, z);
             world.addBody(roofBody);
+            roofBody.userData = {type: 'building'};
     
             // Map the bodies to the meshes
-            // bodyMeshMap.set(leftWallBody, leftWall);
-            // bodyMeshMap.set(rightWallBody, rightWall);
-            // bodyMeshMap.set(backWallBody, backWall);
-            // bodyMeshMap.set(frontWallTopBody, frontWallTop);
-            // bodyMeshMap.set(frontWallLeftBody, frontWallLeft);
-            // bodyMeshMap.set(frontWallRightBody, frontWallRight);
-            // bodyMeshMap.set(roofBody, roof);
+            bodyMeshMap.set(leftWallBody, leftWall);
+            bodyMeshMap.set(rightWallBody, rightWall);
+            bodyMeshMap.set(backWallBody, backWall);
+            bodyMeshMap.set(frontWallTopBody, frontWallTop);
+            bodyMeshMap.set(frontWallLeftBody, frontWallLeft);
+            bodyMeshMap.set(frontWallRightBody, frontWallRight);
+            bodyMeshMap.set(roofBody, roof);
     
             placedStructures++;
         }
@@ -1084,174 +1268,21 @@ function checkPowerUpCollection() {
     }
 }
 
-
-
-function getRandomAction(zombie, actions) {
-    actions = actions.filter(action => action); // Filter out undefined actions
-    const randomIndex = Math.floor(Math.random() * actions.length);
-    return actions[randomIndex];
-}
-
-
-
-
-function switchAction(zombie, toAction) {
-    if (zombie.activeAction !== toAction) {
-        if (zombie.activeAction) zombie.activeAction.fadeOut(0.5); // Smooth transition between animations
-        toAction.reset().fadeIn(0.5).play(); // Play the new animation
-        zombie.activeAction = toAction; // Update the active action
-    }
-}
-
-
-function avoidObstacles(zombiePosition, directionToPlayer, obstacles, zombieSpeed, delta) {
-    const avoidanceForce = new THREE.Vector3();
-    const avoidanceStrength = 10; // Increased from 5
-    const minimumSeparation = 2; // Minimum distance to keep from obstacles
-
-    // Create a slightly larger bounding box for the zombie
-    const zombieBox = new THREE.Box3().setFromCenterAndSize(zombiePosition, new THREE.Vector3(3, 3, 3));
-
-    let avoiding = false;
-
-    obstacles.forEach(obstacle => {
-        if (obstacle.boundingBox.intersectsBox(zombieBox)) {
-            avoiding = true;
-
-            const closestPoint = obstacle.boundingBox.clampPoint(zombiePosition, new THREE.Vector3());
-            const avoidDirection = new THREE.Vector3().subVectors(zombiePosition, closestPoint).normalize();
-            
-            // Calculate distance to obstacle surface
-            const distanceToObstacle = zombiePosition.distanceTo(closestPoint);
-            
-            // Apply stronger avoidance force when very close to obstacle
-            const scaleFactor = Math.max(0, minimumSeparation - distanceToObstacle) * avoidanceStrength;
-            
-            avoidanceForce.add(avoidDirection.multiplyScalar(scaleFactor));
-        }
-    });
-
-    if (avoiding && avoidanceForce.length() > 0) {
-        const blendedDirection = new THREE.Vector3()
-            .addVectors(directionToPlayer, avoidanceForce)
-            .normalize();
-
-        // Use raycasting to check for collisions along the path
-        // Now apply movement and check validity with bounding boxes
-        const newPosition = zombiePosition.clone().add(blendedDirection.multiplyScalar(zombieSpeed * delta));
-        const newZombieBox = new THREE.Box3().setFromCenterAndSize(newPosition, new THREE.Vector3(3, 3, 3));
-
-        // Check if the new position is valid
-        const canMove = !obstacles.some(obstacle => obstacle.boundingBox.intersectsBox(newZombieBox));
-
-        if (canMove) {
-            // Update the zombie's position if valid
-            zombiePosition.copy(newPosition);
-        }
-
-
-        return blendedDirection.multiplyScalar(zombieSpeed * delta);
-    }
-
-    return directionToPlayer.multiplyScalar(zombieSpeed * delta);
-}
-
 function handleZombies(delta) {
     zombies.forEach(zombie => {
         // Update the zombie
         zombie.update(delta, controls);
 
-        // Handle zombie death
-        if (!zombie.isDead && isShiftPressed) {
-            zombie.getShot(1); // Decrease life by 1 when shift is pressed
-        }
-
-        // Smooth zombie movement when alive and distance is greater than minimum
-        const zombiePosition = new THREE.Vector3();
-        const cameraPosition = new THREE.Vector3(controls.object.position.x, 0, controls.object.position.z);
-        zombie.model.getWorldPosition(zombiePosition);
-
-        const direction = new THREE.Vector3().subVectors(cameraPosition, zombiePosition).normalize();
-        const distanceToCamera = zombiePosition.distanceTo(cameraPosition);
-
-        if (distanceToCamera > 1.5) {
-            const avoidanceDirection = avoidObstacles(zombiePosition, direction, obstacles, zombieSpeed, delta);
-
-            // Ensure the avoidance direction is valid and apply it
-            if (!isNaN(avoidanceDirection.x) && !isNaN(avoidanceDirection.y) && !isNaN(avoidanceDirection.z)) {
-                const newPosition = zombiePosition.clone().add(avoidanceDirection);
-                
-                // Check if the new position is valid (not inside any obstacle)
-                const newZombieBox = new THREE.Box3().setFromCenterAndSize(newPosition, new THREE.Vector3(2, 2, 2));
-                const canMove = !obstacles.some(obstacle => obstacle.boundingBox.intersectsBox(newZombieBox));
-                
-                if (canMove) {
-                    zombie.model.position.copy(newPosition);
-                    zombie.body.position.copy(newPosition); // Sync physics body with Three.js mesh
-                }
-            }
-        } else {
-            if (playerLife > 0) {
-                playerLife -= 0.5 * delta; // Decrement by 0.5 per second
+        if (zombie.isAttacking) {
+            if (playerLife > 0 && zombie.life > 0) {
+                playerLife -= 0.25 * delta; // Decrement by 0.5 per second
                 updateLifeBar(); // Update the life bar based on player's life
                 if (playerLife <= 0) {
                     playerLife = 0;
-                    alert('Game Over'); // End game if player's life reaches zero
+                    //alert('Game Over'); // End game if player's life reaches zero
                 }
             }
         }
-    });
-}
-
-// Update loop
-function updatePhysics(deltaTime) {
-    world.step(deltaTime);
-
-    // Apply movement
-    const velocity = characterBody.velocity;
-    velocity.x = 0;
-    velocity.z = 0;
-
-    const speed = 10;
-
-    const direction = new THREE.Vector3();
-    controls.getDirection(direction);
-
-    if (moveForward) {
-        velocity.x += direction.x * speed;
-        velocity.z += direction.z * speed;
-    }
-    if (moveBackward) {
-        velocity.x -= direction.x * speed;
-        velocity.z -= direction.z * speed;
-    }
-    if (moveLeft) {
-        velocity.x += direction.z * speed;
-        velocity.z -= direction.x * speed;
-    }
-    if (moveRight) {
-        velocity.x -= direction.z * speed;
-        velocity.z += direction.x * speed;
-    }
-
-    // Update camera position
-    camera.position.set(characterBody.position.x, characterBody.position.y + 1.5, characterBody.position.z);
-
-    //controls.object.position.copy(characterBody.position);
-    //camera.position.y = 3; // Adjust the camera height as needed
-
-    if (worldTerrain && !isOnGround) {
-        checkIfOnGround();
-    }
-
-   handleZombies(deltaTime);
-
-    // Remove paintballs marked for removal
-    updatePaintballs(world, scene);
-
-    bodyMeshMap.forEach((mesh, body) => {
-        mesh.position.copy(body.position);
-        mesh.quaternion.copy(body.quaternion);
     });
 }
 
@@ -1266,88 +1297,149 @@ function checkIfOnGround() {
 
     isOnGround = result.hasHit;
 }
-       
-        let moveForward = false;
-        let moveBackward = false;
-        let moveLeft = false;
-        let moveRight = false;
-        let canJump = false;
-        let velocityY = 0;
-        const gravity = -9.8;
-        const jumpHeight = 5;
-        let isOnGround = true;
-        let isShiftPressed = false;
 
-        const onKeyDown = function (event) {
-            switch (event.code) {
-                case 'ShiftLeft':
-                    isShiftPressed = true;
-                    break;
-            
-                case 'KeyP':
-                    if (isPaused) {
-                        resumeGame();
-                    } else {
-                        pauseGame();
-                    }
-                    break;
+let moveForward = false;
+let moveBackward = false;
+let moveLeft = false;
+let moveRight = false;
+const jumpHeight = 5;
+let isOnGround = true;
+let isShiftPressed = false;
 
-                case 'KeyW':
-                    moveForward = true;
-                    break;
-                case 'KeyA':
-                    moveLeft = true;
-                    break;
-                case 'KeyS':
-                    moveBackward = true;
-                    break;
-                case 'KeyD':
-                    moveRight = true;
-                    break;
-                case 'Space':
-                    if (isOnGround) {
-                        console.log("Jumping"); 
-                        characterBody.velocity.y = jumpHeight;
-                        isOnGround = false;
-                    }
-                    break;
+const onKeyDown = function (event) {
+    switch (event.code) {
+        case 'ShiftLeft':
+            isShiftPressed = true;
+            break;
+        case 'keyQ':
+            console.log("game ended")
+            localStorage.setItem('currentLevel', 1);
+            window.location.href = 'index.html';            
+            break;
+        case 'keyH':
+            window.location.reload()   
+            break;
+    
+        case 'KeyP':
+            if (isPaused) {
+                resumeGame();
+            } else {
+                pauseGame();
             }
-        };
+            break;
 
-        const onKeyUp = function (event) {
-            switch (event.code) {
-                case 'ShiftLeft':
-                    isShiftPressed = false;
-                    break;
-                case 'KeyW':
-                    moveForward = false;
-                    break;
-                case 'KeyA':
-                    moveLeft = false;
-                    break;
-                case 'KeyS':
-                    moveBackward = false;
-                    break;
-                case 'KeyD':
-                    moveRight = false;
-                    break;
+        case 'KeyW':
+            moveForward = true;
+            break;
+        case 'KeyA':
+            moveLeft = true;
+            break;
+        case 'KeyS':
+            moveBackward = true;
+            break;
+        case 'KeyD':
+            moveRight = true;
+            break;
+        case 'Space':
+            if (isOnGround) {
+                console.log("Jumping"); 
+                characterBody.velocity.y = jumpHeight;
+                isOnGround = false;
             }
-        };
+            break;
+    }
+};
 
-        document.addEventListener('keydown', onKeyDown);
-        document.addEventListener('keyup', onKeyUp);
+const onKeyUp = function (event) {
+    switch (event.code) {
+        case 'ShiftLeft':
+            isShiftPressed = false;
+            break;
+        case 'KeyW':
+            moveForward = false;
+            break;
+        case 'KeyA':
+            moveLeft = false;
+            break;
+        case 'KeyS':
+            moveBackward = false;
+            break;
+        case 'KeyD':
+            moveRight = false;
+            break;
+    }
+};
+
+document.addEventListener('keydown', onKeyDown);
+document.addEventListener('keyup', onKeyUp);
+
+// Update loop
+function updatePhysics(timeStep, deltaTime, maxSubSteps) {
+    world.step(timeStep, deltaTime, maxSubSteps);
+
+    // Apply movement
+    const velocity = characterBody.velocity;
+    velocity.x = 0;
+    velocity.z = 0;
+
+    const direction = new THREE.Vector3();
+    controls.getDirection(direction);
+
+    if (moveForward) {
+        velocity.x += direction.x * moveSpeed;
+        velocity.z += direction.z * moveSpeed;
+    }
+    if (moveBackward) {
+        velocity.x -= direction.x * moveSpeed;
+        velocity.z -= direction.z * moveSpeed;
+    }
+    if (moveLeft) {
+        velocity.x += direction.z * moveSpeed;
+        velocity.z -= direction.x * moveSpeed;
+    }
+    if (moveRight) {
+        velocity.x -= direction.z * moveSpeed;
+        velocity.z += direction.x * moveSpeed;
+    }
+
+    // Update camera position
+    camera.position.set(characterBody.position.x, characterBody.position.y + 1, characterBody.position.z);
+
+    //controls.object.position.copy(characterBody.position);
+    //camera.position.y = 3; // Adjust the camera height as needed
+
+    if (worldTerrain && !isOnGround) {
+        checkIfOnGround();
+    }
+
+   if(zombies.length > 0) {
+        handleZombies(deltaTime);
+    }
+
+    // Remove paintballs marked for removal
+    updatePaintballs(world, scene, handleZombieDeath);
+
+    bodyMeshMap.forEach((mesh, body) => {
+        if (body.userData && (body.userData.type === 'tree' || body.userData.type === 'building' || body.userData.type === 'wall' || body.userData.type === 'zombie')) {
+            // Skip trees, buildings, and walls
+            return;
+        }
+        mesh.position.copy(body.position);
+        mesh.quaternion.copy(body.quaternion);
+    });
+}
 
         // Animation loop
         const clock = new THREE.Clock();
         function animate() {
             const delta = clock.getDelta();
-            const val = 1/60;
-            updatePhysics(val);
-            
+            const timeStep = 1/60;
+            updatePhysics(timeStep, delta, 3);
+            //updateTimer();
             checkGameOver();
+            //cannonDebugger.update();
             
             if (!isPaused) {
-
                 requestAnimationFrame(animate);
                 animateSun();
                 animateMoon();

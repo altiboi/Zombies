@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zombie Camp Cutscene</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #000;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    #cutscene {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      text-align: center;
+    }
+
+    .scene {
+      position: absolute;
+      opacity: 0;
+      transition: opacity 2s ease;
+    }
+
+    .scene.active {
+      opacity: 1;
+    }
+
+    #timer {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 24px;
+      color: red;
+      font-weight: bold;
+    }
+
+    #finalStory {
+      display: none;
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
+
+    #finalStory.active {
+      display: block;
+      opacity: 1;
+    }
+
+    #clickToBegin {
+      display: none; /* Initially hidden */
+      font-size: 24px;
+      color: yellow;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Background audio -->
+  <audio id="backgroundAudio" loop>
+    <source src="background-sound.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+
+  <div id="cutscene">
+    <div id="timer">60</div>
+    <div class="scene active">
+      <img src="camp_scene1.jpg" alt="Camp entrance, eerie silence" width="100%">
+      <p>You arrive at the camp, but something feels wrong...</p>
+    </div>
+    <div class="scene">
+      <img src="camp_scene2.jpg" alt="Abandoned cabins" width="100%">
+      <p>The cabins are abandoned, but you hear rustling...</p>
+    </div>
+    <div class="scene">
+      <img src="camp_scene3.jpg" alt="Zombie silhouettes approaching" width="100%">
+      <p>A group of zombies appears. Your child is somewhere in there!</p>
+    </div>
+    <div class="scene">
+      <img src="camp_scene4.jpg" alt="Desperate call for help" width="100%">
+      <p>Your child shouts for help. You have 60 seconds before they go for him!</p>
+    </div>
+    <div class="scene">
+      <img src="camp_scene5.jpg" alt="You prepare yourself" width="100%">
+      <p>Time is running out. You need to act fast!</p>
+    </div>
+  </div>
+
+  <div id="finalStory">
+    <p>You successfully saved your child from the clutches of the zombies! But the danger isn't over yet; a powerful boss zombie stands in your way. To escape the camp, you must defeat this final boss zombie!</p>
+    <p>Time is running out. You have 60 seconds before the boss attacks! Are you ready to face the ultimate challenge and protect your child?</p>
+    <p id="clickToBegin">Click to Begin</p> <!-- Click to begin message -->
+  </div>
+
+  <script>
+    const scenes = document.querySelectorAll('.scene');
+    const finalStory = document.getElementById('finalStory');
+    const backgroundAudio = document.getElementById('backgroundAudio');
+    const timerDisplay = document.getElementById('timer');
+    const clickToBegin = document.getElementById('clickToBegin');
+
+    let currentScene = 0;
+    let timeLeft = 15;
+
+    // Start background sound
+    backgroundAudio.play();
+
+    // Scene transition every 3 seconds
+    function showNextScene() {
+      if (currentScene < scenes.length - 1) {
+        scenes[currentScene].classList.remove('active');
+        currentScene++;
+        scenes[currentScene].classList.add('active');
+      } else {
+        clearInterval(sceneInterval);
+        showFinalStory();
+      }
+    }
+
+    // Show the final story after cutscenes
+    function showFinalStory() {
+      finalStory.classList.add('active');
+      backgroundAudio.pause(); // Pause the audio during the final story
+    }
+
+    // Start scene transitions and timer countdown
+    const sceneInterval = setInterval(showNextScene, 3000);
+
+    // Timer countdown logic
+    const timerInterval = setInterval(() => {
+      timeLeft--;
+      timerDisplay.textContent = timeLeft;
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        clearInterval(sceneInterval); // Clear the scene interval when time runs out
+        backgroundAudio.pause();
+        clickToBegin.style.display = 'block'; // Show the "Click to Begin" message when time is up
+        finalStory.classList.add('active'); // Show final story
+      }
+    }, 1000);
+
+    // Start the game when the message is clicked
+    document.body.addEventListener('click', () => {
+      if (clickToBegin.style.display === 'block') {
+        window.location.href = 'game.html'; // Redirect to game page
+      }
+    });
+  </script>
+</body>
+</html>

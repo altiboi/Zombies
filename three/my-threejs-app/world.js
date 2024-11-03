@@ -6,9 +6,11 @@ import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js';
 import * as CANNON from 'cannon-es';
 
 export const world = new CANNON.World({
-    gravity: new CANNON.Vec3(0, -9.8, 0),
-    broadphase: new CANNON.NaiveBroadphase(),
+    gravity: new CANNON.Vec3(0, -9.82, 0),
+    broadphase: new CANNON.SAPBroadphase(),
     solver: new CANNON.GSSolver(),
+    solverIterations: 10,
+    solverTolerance: 0.1,
     defaultContactMaterial: new CANNON.Material('default')
 });
 

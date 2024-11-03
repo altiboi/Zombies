@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { gsap } from 'gsap/gsap-core';
 class Zombie {
     constructor(loader, scene, zombies, world) {
         this.position = this.getRandomPosition(); // Randomly choose position
@@ -9,19 +10,19 @@ class Zombie {
         this.zombies = zombies;
         this.kills = 0;
         this.world = world;
-        this.speed = 0.05;
-        this.attackDistance = 3.0;
-        this.idleDistance = 10.0;
         this.model = null;
         this.mixer = null;
         this.isDead = false;
-        this.life = 10; // Initial life
+        this.maxLife = 8; // Maximum life
+        this.life = 8; // Initial life
+        this.lifeBar = null; // Life bar sprite
         this.actionChosen = false;
         this.chosenAction = null;
         this.activeAction = null;
         this.animations = {}; // Store the loaded animations
-        this.collisionDistance = 10; // Minimum distance between zombies to avoid collision
+        this.collisionDistance = 2; // Minimum distance between zombies to avoid collision
         this.body = null; // Physics body
+        this.isAlerted = false;
 
         // List of available zombie models (textures)
         this.availableSkins = [
@@ -29,6 +30,8 @@ class Zombie {
             '/assets/models/zombie4.fbx', '/assets/models/zombie5.fbx', '/assets/models/zombie6.fbx',
             '/assets/models/Mutant.fbx'
         ];
+
+        this.availableAudios = ['/assets/audio/girlzombie.mp3','/assets/audio/yakuzazombie.mp3','/assets/audio/warzombie.mp3'];
 
         this.chaseAnimations = ['/assets/models/chase1.fbx', '/assets/models/chase2.fbx'];
         this.attackAnimations = ['/assets/models/Attack1.fbx', '/assets/models/Attack2.fbx'];
@@ -40,12 +43,22 @@ class Zombie {
         this.currentAttackAnimation = null;
         this.currentIdleAnimation = null;
         this.currentDyingAnimation = null;
+        this.speed = 0.03;
+        this.attackDistance = 3.0;
+        this.idleDistance = 200.0;
+
+        this.idleDuration = 5; // Duration in seconds to play idle before switching
+        this.idleTimer = 0; // Timer for tracking idle duration
+        this.inIdleAnimation = false; // State to track if currently in idle animation
 
         // Choose a random skin from availableSkins
         this.skin = this.getRandomSkin();
+        this.sound = this.getRandomSound();
+        this.sound.volume = 0.1; 
 
         // Load the zombie model and animations
         this.loadModel();
+        this.createLifeBar();
     }
 
     // Method to randomly select a skin from availableSkins
@@ -54,10 +67,15 @@ class Zombie {
         return this.availableSkins[randomIndex];
     }
 
+    getRandomSound() {
+        const randomIndex = Math.floor(Math.random() * this.availableAudios.length);
+        return new Audio(this.availableAudios[randomIndex]);
+    }
+
     // Method to randomly choose a position within a certain range
     getRandomPosition() {
-        const minX = -300, maxX = 300;
-        const minZ = -300, maxZ = 300;
+        const minX = -200, maxX = 200;
+        const minZ = -200, maxZ = 200;
 
         const randomX = Math.random() * (maxX - minX) + minX;
         const randomZ = Math.random() * (maxZ - minZ) + minZ;
@@ -91,7 +109,7 @@ class Zombie {
             // Create physics body for the zombie
             this.createPhysicsBody();
 
-            console.log('Zombie added to the scene:', this.model);
+            //console.log('Zombie added to the scene:', this.model);
         }, undefined, (error) => {
             console.error('Error loading zombie model:', error);
         });
@@ -105,7 +123,11 @@ class Zombie {
             if (action) {
                 this.currentChaseAnimation = this.mixer.clipAction(action);
                 this.currentChaseAnimation.setLoop(THREE.LoopRepeat);
+            } else {
+                console.error("Chase animation not found in the loaded FBX file.");
             }
+        }, undefined, (error) => {
+            console.error("Error loading chase animation:", error);
         });
     }
 
@@ -140,14 +162,18 @@ class Zombie {
             const action = fbx.animations[0];
             if (action) {
                 this.currentDyingAnimation = this.mixer.clipAction(action);
-                this.currentDyingAnimation.setLoop(THREE.LoopOnce);
+                this.currentDyingAnimation.setLoop(THREE.LoopOnce); // Set to not loop on death
+            } else {
+                console.error("Dying animation not found in the loaded FBX file.");
             }
+        }, undefined, (error) => {
+            console.error("Error loading dying animation:", error);
         });
     }
 
     // Create physics body for the zombie
     createPhysicsBody() {
-        const shape = new CANNON.Box(new CANNON.Vec3(1, 2, 1)); // Adjust size to match the zombie height
+        const shape = new CANNON.Box(new CANNON.Vec3(0.55, 2.7, 0.55)); // Adjust size to match the zombie height
         this.body = new CANNON.Body({ mass: 1 });
         this.body.addShape(shape);
         this.body.position.set(this.position.x, this.position.y / 2, this.position.z); // Set y to half the height of the shape
@@ -155,46 +181,132 @@ class Zombie {
         this.world.addBody(this.body);
     }
 
+    // Create life bar for the zombie
+    createLifeBar() {
+        const lifeBarMaterial = new THREE.SpriteMaterial({ color: 0xff0000 });
+        this.lifeBar = new THREE.Sprite(lifeBarMaterial);
+        this.lifeBar.scale.set(1, 0.1, 1); // Adjust the size of the life bar
+        this.scene.add(this.lifeBar);
+    }
+
+    // Update the life bar based on the zombie's current life
+    updateLifeBar() {
+        const lifePercentage = this.life / this.maxLife;
+        if (this.lifeBar) {
+            this.lifeBar.material.color.setHSL((lifePercentage * 0.3), 1, 0.5); // Change color based on life percentage
+            this.lifeBar.scale.set(lifePercentage, 0.1, 1); // Adjust the width based on life percentage
+            this.lifeBar.position.set(this.model.position.x, this.model.position.y + 3, this.model.position.z); // Position above the zombie
+            this.lifeBar.visible = true; // Ensure the life bar is visible when the zombie is alive
+        }
+    }
+
     getShot(damage) {
         this.life -= damage;
         console.log(`Zombie hit! Remaining life: ${this.life}`);
-        if (this.life <= 0) {
-            console.log('Zombie killed!');
+        if (this.life <= 0 && !this.isDead) {
             this.die();
         }
     }
 
-    // Method to handle dying
     die() {
+        console.log("Zombie has died.");
         this.isDead = true;
-        this.kills++;
-        if (this.currentDyingAnimation) {
-            this.playAnimation(this.currentDyingAnimation);
-        }
-        setTimeout(() => {
-            this.remove();
-        }, 5000); // Remove the zombie after 5 seconds
-    }
+        this.lifeBar.visible = false; // Hide the life bar when the zombie is dead
+        this.sound.pause();
 
-    remove() {
-        if (this.model) {
-            this.scene.remove(this.model);
-            this.model = null;
+        // Stop all current animations
+        if (this.mixer) {
+            this.mixer.stopAllAction();
         }
-        if (this.body) {
-            this.world.removeBody(this.body);
-            this.body = null;
-        }
-        const index = this.zombies.indexOf(this);
-        if (index > -1) {
-            this.zombies.splice(index, 1);
+
+        // If we have a death animation, play it once
+        if (this.currentDyingAnimation) {
+            this.currentDyingAnimation.reset();
+            this.currentDyingAnimation.setLoop(THREE.LoopOnce);
+
+            // Slow down the dying animation
+            this.currentDyingAnimation.timeScale = 0.4; // Adjust the timeScale to slow down the animation
+            this.currentDyingAnimation.play();
+
+            // Set the duration of the fade-out based on the animation duration
+            const deathDuration = (this.currentDyingAnimation.getClip().duration / this.currentDyingAnimation.timeScale) - 5;
+            console.log(`Death duration: ${deathDuration} seconds`);
+
+            // Function to handle removing the model and body
+            const onFinished = () => {
+                if (this.scene && this.model) {
+                    this.scene.remove(this.model);
+                    this.model = null;
+                }
+                if (this.world && this.body) {
+                    this.world.removeBody(this.body);
+                    this.body = null;
+                }
+                if (this.lifeBar) {
+                    this.scene.remove(this.lifeBar);
+                    this.lifeBar = null;
+                }
+            };
+
+            // Delay the fade-out until the animation is nearly done
+            const fadeOutStart = deathDuration - 1; // Start fading 1 second before end
+            if (this.model) {
+                this.model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material.transparent = true; // Enable opacity fading
+
+                        // Use GSAP to fade out opacity
+                        gsap.to(child.material, {
+                            opacity: 0,
+                            duration: 1, // Fade duration
+                            delay: fadeOutStart,
+                            onComplete: onFinished,
+                            ease: 'power1.out'
+                        });
+                    }
+                });
+            } else {
+                setTimeout(onFinished, deathDuration * 1000); // Convert to milliseconds
+            }
+        } else {
+            // If no dying animation, fade out immediately
+            if (this.model) {
+                this.model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material.transparent = true; // Enable opacity fading
+
+                        // Use GSAP to fade out opacity
+                        gsap.to(child.material, {
+                            opacity: 0,
+                            duration: 1,
+                            onComplete: () => {
+                                if (this.scene && this.model) {
+                                    this.scene.remove(this.model);
+                                    this.model = null;
+                                }
+                                if (this.world && this.body) {
+                                    this.world.removeBody(this.body);
+                                    this.body = null;
+                                }
+                            },
+                            ease: 'power1.out'
+                        });
+                    }
+                });
+            } else {
+                // Remove body immediately if no model exists
+                if (this.world && this.body) {
+                    this.world.removeBody(this.body);
+                    this.body = null;
+                }
+            }
         }
     }
 
     // Check collision with other zombies and avoid them
     avoidCollisionWithOtherZombies() {
         this.zombies.forEach(zombie => {
-            if (zombie !== this && !zombie.isDead) {
+            if (zombie.model && zombie !== this && !zombie.isDead) {
                 const distance = this.model.position.distanceTo(zombie.model.position);
                 if (distance < this.collisionDistance) {
                     // Adjust direction to avoid the collision
@@ -207,53 +319,75 @@ class Zombie {
     }
 
     update(delta, controls) {
-        if (this.mixer) this.mixer.update(delta);
+        // Only update animations if we have a mixer and the zombie isn't dead
+        if (this.mixer && (!this.isDead || (this.isDead && this.currentDyingAnimation?.isRunning()))) {
+            this.mixer.update(delta);
+        }
 
-        const zombiePosition = new THREE.Vector3();
+        // Stop further updates for dead zombies
+        if (this.model == null || this.isDead) {
+            return;
+        }
+
+        // Sync physics body with Three.js mesh
+        this.body.position.copy(this.model.position);
+        this.body.quaternion.copy(this.model.quaternion);
+        // Check if zombies stay within world bounds
+        this.checkBounds();
+        this.updateLifeBar();
+
+        // Get camera/player position
         const cameraPosition = new THREE.Vector3(controls.object.position.x, 0, controls.object.position.z);
-        this.model.getWorldPosition(zombiePosition);
-
+        const zombiePosition = this.model.position;
         const direction = new THREE.Vector3().subVectors(cameraPosition, zombiePosition).normalize();
-        this.model.lookAt(cameraPosition);
-
         const distanceToCamera = zombiePosition.distanceTo(cameraPosition);
+
+        // Adjust zombie rotation to face the player
+        this.model.lookAt(cameraPosition);
 
         // Avoid collision with other zombies
         this.avoidCollisionWithOtherZombies();
 
-        // 1. If far from the camera (> 50), play idle action
-        if (distanceToCamera > 50) {
-            if (this.currentIdleAnimation) {
-                this.playAnimation(this.currentIdleAnimation);
+        // Play sound only when within a certain proximity to the player
+        const soundProximity = 50; // Adjust this value as needed
+        if (distanceToCamera <= soundProximity) {
+            if (this.sound.paused) {
+                this.sound.play();
+            }
+        } else {
+            if (!this.sound.paused) {
+                this.sound.pause();
             }
         }
-        // 2. If close to the camera (within 10), attack
-        else if (distanceToCamera <= 5) {
-            if (!this.actionChosen) {
-                this.chosenAction = this.currentAttackAnimation;
-                this.actionChosen = true;
-            }
 
-            if (this.chosenAction) {
-                this.playAnimation(this.chosenAction);
-            }
-        }
-        // 3. If in between (between 10 and 50), move towards the camera and run
-        else {
-            this.actionChosen = false; // Reset chosen action
-            this.model.position.add(direction.multiplyScalar(this.speed)); // Move zombie
-            this.body.position.copy(this.model.position); // Sync physics body with Three.js mesh
-
-            // Play running animation
-            if (this.currentChaseAnimation) {
-                this.currentChaseAnimation.timeScale = this.speed / 16;
+        if (this.isAlerted) {
+            if (distanceToCamera > this.attackDistance) {
+                this.isAttacking = false;
                 this.playAnimation(this.currentChaseAnimation);
+                direction.normalize();
+                this.model.position.add(direction.multiplyScalar(this.speed));
+                this.model.lookAt(cameraPosition);
+            } else if (distanceToCamera <= this.attackDistance) {
+                this.isAttacking = true;
+                this.playAnimation(this.currentAttackAnimation);
+            }
+        } else {
+            if (distanceToCamera > this.idleDistance) {
+                this.isAttacking = false;
+                this.playIdleAnimation(1);
+            } else if (distanceToCamera <= this.idleDistance && distanceToCamera > this.attackDistance) {
+                this.isAttacking = false;
+                this.playAnimation(this.currentChaseAnimation);
+                direction.normalize();
+                this.model.position.add(direction.multiplyScalar(this.speed));
+                this.model.lookAt(cameraPosition);
+            } else if (distanceToCamera <= this.attackDistance) {
+                this.isAttacking = true;
+                this.playAnimation(this.currentAttackAnimation);
             }
         }
-
-        // Ensure zombies stay within the world bounds
-        this.checkBounds();
     }
+
 
     // Ensure zombies stay within the world bounds
     checkBounds() {
@@ -282,6 +416,29 @@ class Zombie {
             this.mixer.stopAllAction();
             animation.play();
         }
+    }
+
+    playIdleAnimation(delta) {
+        if (!this.inIdleAnimation) {
+            this.inIdleAnimation = true;
+            this.idleTimer = this.idleDuration; // Reset the idle timer
+            this.playAnimation(this.currentIdleAnimation);
+        } else {
+            // Reduce the timer by the delta time (time passed)
+            this.idleTimer -= delta;
+            if (this.idleTimer <= 0) {
+                this.inIdleAnimation = false; // Exit idle state after duration
+            }
+        }
+    }
+
+    triggerAlert() {
+        console.log("sound heard")
+        this.isAlerted = true;
+
+        setTimeout(() => {
+            this.isAlerted = false;
+        }, 30000);
     }
 }
 

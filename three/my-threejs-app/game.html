@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite App</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        #instructions {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            padding: 10px;
+            font-family: Arial, sans-serif;
+        }
+        #objective {
+            position: absolute;
+            top: 10px; /* Position it a bit below the top */
+            left: 50%; /* Center it horizontally */
+            transform: translateX(-50%); /* Adjust for centering */
+            color: white; /* Text color */
+            font-size: 20px; /* Font size */
+            font-family: Arial, sans-serif; /* Font family */
+            text-align: center; /* Center text alignment */
+            z-index: 1000; /* Make sure it's on top of other elements */
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px; /* Adjust the center dot size */
+            height: 4px;
+            background: whitesmoke;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        .crosshair-line {
+            position: absolute;
+            background: whitesmoke;
+            pointer-events: none;
+        }
+
+        #crosshair-line-top,
+        #crosshair-line-bottom {
+            width: 2px;
+            height: 15px; /* Adjust the length of the vertical lines */
+        }
+
+        #crosshair-line-left,
+        #crosshair-line-right {
+            width: 15px; /* Adjust the length of the horizontal lines */
+            height: 2px;
+        }
+
+        #crosshair-line-top {
+            top: calc(50% - 25px); /* Adjust the gap above the center */
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        #crosshair-line-bottom {
+            top: calc(50% + 10px); /* Adjust the gap below the center */
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        #crosshair-line-left {
+            top: 50%;
+            left: calc(50% - 25px); /* Adjust the gap to the left of the center */
+            transform: translateY(-50%);
+        }
+
+        #crosshair-line-right {
+            top: 50%;
+            left: calc(50% + 10px); /* Adjust the gap to the right of the center */
+            transform: translateY(-50%);
+        }
+        #loading-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+      }
+      #progress-container {
+        width: 80%;
+        background: #333;
+        height: 20px;
+      }
+      #progress-bar {
+        width: 0;
+        height: 100%;
+        background: #00ff00;
+      }
+      .overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 30px; /* Adjust the size as needed */
+            color: white; /* Text color */
+            background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
+            padding: 2px;
+            border-radius: 10px;
+            display: none; /* Initially hidden */
+            z-index: 100; /* Ensure it appears above other elements */
+        }
+
+        #playSign {
+            color: green; /* Play sign color */
+            display: none; /* Initially hidden */
+        }
+    </style>
+  </head>
+  <body>
+    <div id="instructions">
+        Click to start<br>
+        WASD to move<br>
+        Mouse to look around<br>
+        ESC to release mouse
+    </div>
+
+    <div id="objective">
+        
+    </div>
+    
+    <div id="crosshair">
+        <div id="crosshair-line-top" class="crosshair-line"></div>
+        <div id="crosshair-line-bottom" class="crosshair-line"></div>
+        <div id="crosshair-line-left" class="crosshair-line"></div>
+        <div id="crosshair-line-right" class="crosshair-line"></div>
+    </div>
+    <div id="loading-screen">
+        <div>Loading... Please wait</div>
+        <div id="progress-container">
+          <div id="progress-bar"></div>
+        </div>
+      </div>
+
+      
+      <div id="pauseSign" class="overlay">
+        <h1>Game Paused</h1>
+        <p >Resume Game by pressing P</p>
+        <p >End Game by pressing Q</p>
+        <p >Restart Game by pressing H</p>
+
+     
+      </div>
+      <div id="playSign" class="overlay">PLAY</div>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
