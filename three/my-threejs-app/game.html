@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -6,82 +6,86 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vite App</title>
     <style>
-        body { margin: 0; }
-        canvas { display: block; }
-        #instructions {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.5);
-            color: white;
-            padding: 10px;
-            font-family: Arial, sans-serif;
-        }
-        #objective {
-            position: absolute;
-            top: 10px; /* Position it a bit below the top */
-            left: 50%; /* Center it horizontally */
-            transform: translateX(-50%); /* Adjust for centering */
-            color: white; /* Text color */
-            font-size: 20px; /* Font size */
-            font-family: Arial, sans-serif; /* Font family */
-            text-align: center; /* Center text alignment */
-            z-index: 1000; /* Make sure it's on top of other elements */
-        }
-        #crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 4px; /* Adjust the center dot size */
-            height: 4px;
-            background: whitesmoke;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-        }
+      body {
+        margin: 0;
+      }
+      canvas {
+        display: block;
+      }
+      #instructions {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.5);
+        color: white;
+        padding: 10px;
+        font-family: Arial, sans-serif;
+      }
+      #objective {
+        position: absolute;
+        top: 10px; /* Position it a bit below the top */
+        left: 50%; /* Center it horizontally */
+        transform: translateX(-50%); /* Adjust for centering */
+        color: white; /* Text color */
+        font-size: 20px; /* Font size */
+        font-family: Arial, sans-serif; /* Font family */
+        text-align: center; /* Center text alignment */
+        z-index: 1000; /* Make sure it's on top of other elements */
+      }
+      #crosshair {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 4px; /* Adjust the center dot size */
+        height: 4px;
+        background: whitesmoke;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+      }
 
-        .crosshair-line {
-            position: absolute;
-            background: whitesmoke;
-            pointer-events: none;
-        }
+      .crosshair-line {
+        position: absolute;
+        background: whitesmoke;
+        pointer-events: none;
+      }
 
-        #crosshair-line-top,
-        #crosshair-line-bottom {
-            width: 2px;
-            height: 15px; /* Adjust the length of the vertical lines */
-        }
+      #crosshair-line-top,
+      #crosshair-line-bottom {
+        width: 2px;
+        height: 15px; /* Adjust the length of the vertical lines */
+      }
 
-        #crosshair-line-left,
-        #crosshair-line-right {
-            width: 15px; /* Adjust the length of the horizontal lines */
-            height: 2px;
-        }
+      #crosshair-line-left,
+      #crosshair-line-right {
+        width: 15px; /* Adjust the length of the horizontal lines */
+        height: 2px;
+      }
 
-        #crosshair-line-top {
-            top: calc(50% - 25px); /* Adjust the gap above the center */
-            left: 50%;
-            transform: translateX(-50%);
-        }
+      #crosshair-line-top {
+        top: calc(50% - 25px); /* Adjust the gap above the center */
+        left: 50%;
+        transform: translateX(-50%);
+      }
 
-        #crosshair-line-bottom {
-            top: calc(50% + 10px); /* Adjust the gap below the center */
-            left: 50%;
-            transform: translateX(-50%);
-        }
+      #crosshair-line-bottom {
+        top: calc(50% + 10px); /* Adjust the gap below the center */
+        left: 50%;
+        transform: translateX(-50%);
+      }
 
-        #crosshair-line-left {
-            top: 50%;
-            left: calc(50% - 25px); /* Adjust the gap to the left of the center */
-            transform: translateY(-50%);
-        }
+      #crosshair-line-left {
+        top: 50%;
+        left: calc(50% - 25px); /* Adjust the gap to the left of the center */
+        transform: translateY(-50%);
+      }
 
-        #crosshair-line-right {
-            top: 50%;
-            left: calc(50% + 10px); /* Adjust the gap to the right of the center */
-            transform: translateY(-50%);
-        }
-        #loading-screen {
+      #crosshair-line-right {
+        top: 50%;
+        left: calc(50% + 10px); /* Adjust the gap to the right of the center */
+        transform: translateY(-50%);
+      }
+      #loading-screen {
         position: fixed;
         top: 0;
         left: 0;
@@ -102,63 +106,134 @@
       #progress-bar {
         width: 0;
         height: 100%;
-        background: #00ff00;
+        background: #ff0000;
       }
       .overlay {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 30px; /* Adjust the size as needed */
-            color: white; /* Text color */
-            background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
-            padding: 2px;
-            border-radius: 10px;
-            display: none; /* Initially hidden */
-            z-index: 100; /* Ensure it appears above other elements */
-        }
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        backdrop-filter: blur(8px);
+        display: none;
+        z-index: 100;
+      }
 
-        #playSign {
-            color: green; /* Play sign color */
-            display: none; /* Initially hidden */
+      .pause-menu {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 300px;
+        height: 100%;
+        padding: 20px;
+      }
+
+      .pause-menu h1 {
+        font-family: "Creepster", cursive;
+        color: #ff0000;
+        text-shadow: 0 0 10px #ff0000;
+        font-size: 48px;
+        margin-bottom: 40px;
+        text-align: center;
+      }
+
+      .menu-items {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        margin-top: 40px;
+      }
+
+      .menu-item {
+        padding: 15px 20px;
+        font-size: 24px;
+        color: #ffffff;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border-left: 4px solid transparent;
+      }
+
+      .menu-item:hover,
+      .menu-item.active {
+        background-color: rgba(139, 0, 0, 0.4);
+        border-left: 4px solid #ff0000;
+        padding-left: 30px;
+        text-shadow: 0 0 5px #ff0000;
+      }
+
+      .menu-item.active {
+        color: #ff0000;
+        text-shadow: 0 0 5px #ff0000;
+      }
+
+      #playSign {
+        color: green; /* Play sign color */
+        display: none; /* Initially hidden */
+      }
+
+      .loading-text,
+      .dots::after {
+        color: #ff0000;
+        font-size: 36px;
+        text-shadow: 0 0 10px #ff0000;
+      }
+
+      @keyframes dots {
+        0%,
+        20% {
+          content: ".";
         }
+        40% {
+          content: "..";
+        }
+        60%,
+        100% {
+          content: "...";
+        }
+      }
+
+      .dots::after {
+        content: ".";
+        animation: dots 1.5s infinite;
+      }
     </style>
   </head>
   <body>
     <div id="instructions">
-        Click to start<br>
-        WASD to move<br>
-        Mouse to look around<br>
-        ESC to release mouse
+      Click to start<br />
+      WASD to move<br />
+      Mouse to look around<br />
+      ESC to release mouse
     </div>
 
-    <div id="objective">
-        
-    </div>
-    
+    <div id="objective"></div>
+
     <div id="crosshair">
-        <div id="crosshair-line-top" class="crosshair-line"></div>
-        <div id="crosshair-line-bottom" class="crosshair-line"></div>
-        <div id="crosshair-line-left" class="crosshair-line"></div>
-        <div id="crosshair-line-right" class="crosshair-line"></div>
+      <div id="crosshair-line-top" class="crosshair-line"></div>
+      <div id="crosshair-line-bottom" class="crosshair-line"></div>
+      <div id="crosshair-line-left" class="crosshair-line"></div>
+      <div id="crosshair-line-right" class="crosshair-line"></div>
     </div>
     <div id="loading-screen">
-        <div>Loading... Please wait</div>
-        <div id="progress-container">
-          <div id="progress-bar"></div>
+      <div>
+        <span class="loading-text">Loading</span><span class="dots"></span>
+      </div>
+      <div id="progress-container">
+        <div id="progress-bar"></div>
+      </div>
+    </div>
+
+    <div id="pauseSign" class="overlay">
+      <div class="pause-menu">
+        <h1>PAUSED</h1>
+        <div class="menu-items">
+          <div class="menu-item active" data-action="resume">Resume Game</div>
+          <div class="menu-item" data-action="restart">Restart Game</div>
+          <div class="menu-item" data-action="quit">End Game</div>
         </div>
       </div>
-
-      
-      <div id="pauseSign" class="overlay">
-        <h1>Game Paused</h1>
-        <p >Resume Game by pressing P</p>
-        <p >End Game by pressing Q</p>
-        <p >Restart Game by pressing H</p>
-
-     
-      </div>
-      <div id="playSign" class="overlay">PLAY</div>
+    </div>
+    <div id="playSign" class="overlay">PLAY</div>
     <script type="module" src="/main.js"></script>
   </body>
 </html>
