@@ -78,6 +78,7 @@ killCount.style.padding = "5px";
 killCount.style.imageRendering = "pixelated"; // Retro pixelated effect
 killCount.innerHTML = `Kills: 0<br>Level: 1`; // Initial kill count
 
+//fsd
 document.body.appendChild(killCount);
 
 function updateKillCount() {
