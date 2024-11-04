@@ -13,7 +13,9 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background-color: #000;
+      background-image: url('/assets/images/cutscene-images/level 3.png'); /* Replace with your image path */
+      background-size: cover;
+      background-position: center;      
       overflow: hidden;
       font-family: Arial, sans-serif;
     }
@@ -39,6 +41,13 @@
     .scene.active {
       opacity: 1;
     }
+    .scene p {
+      font-size: 2rem; /* Increased font size for emphasis */
+      font-weight: bold;
+      color: white;
+      text-shadow: 2px 2px 0 #000, -2px 2px 0 #000, 2px -2px 0 #000, -2px -2px 0 #000; /* Black border effect */
+      margin: 0.5em 0;
+    }
 
     #timer {
       position: absolute;
@@ -60,23 +69,18 @@
   <div id="cutscene">
     <div id="timer">60</div>
     <div class="scene active">
-      <img src="camp_scene1.jpg" alt="Camp entrance, eerie silence" width="100%">
       <p>You successfully saved your child from the clutches of the zombies!</p>
     </div>
     <div class="scene">
-      <img src="camp_scene2.jpg" alt="Holding your child tightly" width="100%">
       <p>But the danger isn't over yet; a powerful boss zombie stands in your way.</p>
     </div>
     <div class="scene">
-      <img src="camp_scene3.jpg" alt="Boss zombie appearing" width="100%">
       <p>To escape the camp, you must defeat this final boss zombie!</p>
     </div>
     <div class="scene">
-      <img src="camp_scene4.jpg" alt="Preparing for battle" width="100%">
       <p>Time is running out. You have 60 seconds before the boss attacks!</p>
     </div>
     <div class="scene">
-      <img src="camp_scene5.jpg" alt="Fighting the boss zombie" width="100%">
       <p>Are you ready to face the ultimate challenge and protect your child?</p>
     </div>
   </div>

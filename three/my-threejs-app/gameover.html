@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game Over</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-image: url('/assets/images/cutscene-images/gameover.png'); /* Replace with your image path */
+      background-size: cover;
+      background-position: center;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    #gameOverScreen {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      text-align: center;
+    }
+
+    .gameOverText {
+      font-size: 3rem; /* Large text size for Game Over */
+      text-shadow: 2px 2px 4px black; /* Black outline */
+      margin-bottom: 20px;
+    }
+
+    #clickToExit {
+      font-size: 2rem; /* "Click to Exit" text size */
+      color: yellow;
+      text-shadow: 2px 2px 4px black; /* Black outline */
+      cursor: pointer;
+      transition: color 0.3s ease;
+    }
+
+    #clickToExit:hover {
+      color: orange;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="gameOverScreen">
+    <div class="gameOverText">Game Over, you have ESCAPED, now spread the word to the world over to prevent the spread soldier!</div>
+    <p id="clickToExit">Click to Exit</p> <!-- Click to exit message -->
+  </div>
+
+  <script>
+    // Redirect to index.html when the "Click to Exit" message is clicked
+    document.body.addEventListener('click', () => {
+      window.location.href = 'index.html'; // Redirect to index page
+    });
+  </script>
+</body>
+</html>

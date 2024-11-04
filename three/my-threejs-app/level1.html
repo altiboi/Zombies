@@ -13,7 +13,9 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background-color: #000;
+      background-image: url('/assets/images/cutscene-images/level1_1.png'); /* Replace with your image path */
+      background-size: cover;
+      background-position: center;
       overflow: hidden;
       font-family: Arial, sans-serif;
     }
@@ -34,6 +36,8 @@
       position: absolute;
       opacity: 0;
       transition: opacity 2s ease;
+      font-size: 2rem; /* Increase text size */
+      text-shadow: 2px 2px 4px black; /* Black outline */
     }
 
     .scene.active {
@@ -44,15 +48,18 @@
       position: absolute;
       top: 20px;
       right: 20px;
-      font-size: 24px;
+      font-size: 2.5rem; /* Increase timer font size */
       color: red;
       font-weight: bold;
+      text-shadow: 2px 2px 4px black; /* Black outline */
     }
 
     #finalStory {
       display: none;
       opacity: 0;
       transition: opacity 1s ease;
+      font-size: 1.8rem; /* Increase final story font size */
+      text-shadow: 2px 2px 4px black; /* Black outline */
     }
 
     #finalStory.active {
@@ -62,9 +69,10 @@
 
     #clickToBegin {
       display: none; /* Initially hidden */
-      font-size: 24px;
+      font-size: 2rem; /* Increase "Click to Begin" font size */
       color: yellow;
       margin-top: 20px;
+      text-shadow: 2px 2px 4px black; /* Black outline */
     }
   </style>
 </head>
@@ -78,30 +86,25 @@
   <div id="cutscene">
     <div id="timer">60</div>
     <div class="scene active">
-      <img src="camp_scene1.jpg" alt="Camp entrance, eerie silence" width="100%">
-      <p>You arrive at the camp, but something feels wrong...</p>
+      <p>You wake up in the  camp, but something feels wrong...</p>
     </div>
     <div class="scene">
-      <img src="camp_scene2.jpg" alt="Abandoned cabins" width="100%">
       <p>The cabins are abandoned, but you hear rustling...</p>
     </div>
     <div class="scene">
-      <img src="camp_scene3.jpg" alt="Zombie silhouettes approaching" width="100%">
-      <p>A group of zombies appears. Your child is somewhere in there!</p>
+      <p>A group of zombies appears. The friends you once knew are nowhere to be found!</p>
     </div>
     <div class="scene">
-      <img src="camp_scene4.jpg" alt="Desperate call for help" width="100%">
-      <p>Your child shouts for help. You have 60 seconds before they go for him!</p>
+      <p>A suspicious chemical seems to have infected everyone but you! you have to get out before the time runs out, or you have to kill them all!</p>
     </div>
     <div class="scene">
-      <img src="camp_scene5.jpg" alt="You prepare yourself" width="100%">
       <p>Time is running out. You need to act fast!</p>
     </div>
   </div>
 
   <div id="finalStory">
-    <p>You successfully saved your child from the clutches of the zombies! But the danger isn't over yet; a powerful boss zombie stands in your way. To escape the camp, you must defeat this final boss zombie!</p>
-    <p>Time is running out. You have 60 seconds before the boss attacks! Are you ready to face the ultimate challenge and protect your child?</p>
+    <p>The danger isn't over yet; a powerful boss zombie stands in your way. To escape the camp, you must defeat this final boss zombie!</p>
+    <p>Time is running out.Are you ready to face the ultimate challenge and protect yourself and humanity?</p>
     <p id="clickToBegin">Click to Begin</p> <!-- Click to begin message -->
   </div>
 

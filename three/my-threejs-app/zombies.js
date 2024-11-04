@@ -348,19 +348,23 @@ class Zombie {
         // Avoid collision with other zombies
         this.avoidCollisionWithOtherZombies();
 
+        if(this.sound.gameover){
+            this.sound.pause();
+        }
+
         // Play sound only when within a certain proximity to the player
         const soundProximity = 40; // Adjust this value as needed
         if (distanceToCamera <= soundProximity) {
-            if (this.sound.paused) {
+            if (this.sound.paused && !this.sound.gameover) {
                 this.sound.play();
             }
             // Adjust volume based on distance
             const maxVolumeDistance = 10; // Distance at which the volume is at maximum
             const minVolumeDistance = soundProximity; // Distance at which the volume is at minimum
-            const volume = 0.1 - (distanceToCamera - maxVolumeDistance) / (minVolumeDistance - maxVolumeDistance);
+            const volume = 0.15 - (distanceToCamera - maxVolumeDistance) / (minVolumeDistance - maxVolumeDistance);
             this.sound.volume = Math.max(0, Math.min(0.1, volume)); // Clamp volume between 0 and 1
         } else {
-            if (!this.sound.paused) {
+            if (!this.sound.paused || this.sound.gameover) {
                 this.sound.pause();
             }
         }

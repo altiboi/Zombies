@@ -13,7 +13,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background-color: #000;
       overflow: hidden;
       font-family: Arial, sans-serif;
     }
@@ -34,6 +33,10 @@
       position: absolute;
       opacity: 0;
       transition: opacity 2s ease;
+      font-size: 36px;
+      font-weight: bold;
+      text-shadow: 2px 2px 4px black;
+      color: yellow;
     }
 
     .scene.active {
@@ -44,14 +47,14 @@
       position: absolute;
       top: 20px;
       right: 20px;
-      font-size: 24px;
+      font-size: 32px;
       color: red;
       font-weight: bold;
+      text-shadow: 2px 2px 4px black;
     }
   </style>
 </head>
 <body>
-  <!-- Background audio -->
   <audio id="backgroundAudio" loop>
     <source src="background-sound.mp3" type="audio/mpeg">
     Your browser does not support the audio element.
@@ -60,23 +63,18 @@
   <div id="cutscene">
     <div id="timer">60</div>
     <div class="scene active">
-      <img src="camp_scene1.jpg" alt="Camp entrance, eerie silence" width="100%">
       <p>You managed to save your child from the zombies!</p>
     </div>
     <div class="scene">
-      <img src="camp_scene2.jpg" alt="Holding your child tightly" width="100%">
       <p>But now, danger lurks around every corner.</p>
     </div>
     <div class="scene">
-      <img src="camp_scene3.jpg" alt="Zombies approaching" width="100%">
       <p>To escape the camp, you must protect your child and defeat 10 zombies!</p>
     </div>
     <div class="scene">
-      <img src="camp_scene4.jpg" alt="Preparing for battle" width="100%">
       <p>Time is running out. You have 60 seconds before they close in!</p>
     </div>
     <div class="scene">
-      <img src="camp_scene5.jpg" alt="Fighting off zombies" width="100%">
       <p>Are you ready to fight for your child's safety?</p>
     </div>
   </div>
@@ -87,11 +85,18 @@
     const timerDisplay = document.getElementById('timer');
     let currentScene = 0;
     let timeLeft = 15;
+    
+    // List of background images to flicker through
+    const backgroundImages = [
+      'url("./assets/images/cutscene-images/level 2 (2).png")',
+      'url("./assets/images/cutscene-images/level 2.png")',
+      'url("./assets/images/cutscene-images/level 2_2.png")'
+    ];
 
     // Start background sound
     backgroundAudio.play();
 
-    // Scene transition every 12 seconds
+    // Scene transition every 3 seconds
     function showNextScene() {
       if (currentScene < scenes.length - 1) {
         scenes[currentScene].classList.remove('active');
@@ -101,6 +106,15 @@
         clearInterval(sceneInterval);
       }
     }
+
+    // Background flicker effect every second
+    let backgroundIndex = 0;
+    function flickerBackground() {
+      document.body.style.backgroundImage = backgroundImages[backgroundIndex];
+      backgroundIndex = (backgroundIndex + 1) % backgroundImages.length;
+    }
+
+    setInterval(flickerBackground, 3000);
 
     // Start scene transitions and timer countdown
     const sceneInterval = setInterval(showNextScene, 3000);

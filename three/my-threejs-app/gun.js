@@ -31,7 +31,7 @@ export function initGun(zombiesArray, bodyMeshMapInstance, renderer, camera) {
     // Load the gun model
     const GLTFloader = new GLTFLoader();
     const gunLoadPromise = new Promise((resolve, reject) => {
-        GLTFloader.load('./submachine_gun.glb', function (gltf) {
+        GLTFloader.load('./assets/models/submachine_gun.glb', function (gltf) {
             gun = gltf.scene;
             renderer.shadowMap.enabled = true;
             gun.traverse((child) => {
@@ -229,14 +229,19 @@ export function reloadGun() {
 // Function to update the ammo display
 function updateAmmoDisplay() {
     const ammoDisplay = document.getElementById('ammoDisplay');
-    ammoDisplay.textContent = `Ammo: ${currentAmmo}/${magazineSize}`;
+    ammoDisplay.innerHTML = `<span style="font-weight: bold;">Ammo:</span> ${currentAmmo} <span style="opacity: 0.7;">/</span> ${magazineSize}`;
+
+    // Change color based on ammo count
+    if (currentAmmo <= 5) {
+        ammoDisplay.style.color = '#ff4d4d';  // Red for critical
+    } else if (currentAmmo <= 10) {
+        ammoDisplay.style.color = '#ffcc00';  // Yellow for warning
+    } else {
+        ammoDisplay.style.color = '#00ff99';  // Green for sufficient ammo
+    }
 
     const reloadButton = document.getElementById('reloadButton');
-    if (currentAmmo < 10) {
-        reloadButton.style.display = 'block';
-    } else {
-        reloadButton.style.display = 'none';
-    }
+    reloadButton.style.display = currentAmmo < 10 ? 'block' : 'none';
 }
 
 // Initial setup for ammo display and reload button
@@ -246,25 +251,38 @@ document.addEventListener('DOMContentLoaded', () => {
     ammoDisplay.style.position = 'absolute';
     ammoDisplay.style.bottom = '10px';
     ammoDisplay.style.right = '10px';
-    ammoDisplay.style.color = 'white';
-    ammoDisplay.style.fontSize = '20px';
-    ammoDisplay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-    ammoDisplay.style.padding = '5px';
-    ammoDisplay.style.borderRadius = '5px';
+    ammoDisplay.style.color = '#00ff99';  // Default color
+    ammoDisplay.style.fontSize = '24px';
+    ammoDisplay.style.fontFamily = "'Orbitron', sans-serif";  // Add a sci-fi or arcade-style font
+    ammoDisplay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    ammoDisplay.style.padding = '8px 12px';
+    ammoDisplay.style.border = '2px solid #808080';
+    ammoDisplay.style.borderRadius = '8px';
+    ammoDisplay.style.textAlign = 'center';
+    ammoDisplay.style.boxShadow = '0px 0px 10px rgba(0, 0, 0, 0.5)';  // Soft shadow for depth
     document.body.appendChild(ammoDisplay);
 
     const reloadButton = document.createElement('button');
     reloadButton.id = 'reloadButton';
     reloadButton.textContent = 'Reload';
     reloadButton.style.position = 'absolute';
-    reloadButton.style.bottom = '50px';
+    reloadButton.style.bottom = '80px'; // Adjusted position further up to avoid overlap
     reloadButton.style.right = '10px';
     reloadButton.style.display = 'none';
+    reloadButton.style.padding = '6px 12px';
+    reloadButton.style.fontSize = '16px';
+    reloadButton.style.color = '#ffffff';
+    reloadButton.style.backgroundColor = '#ff4d4d';
+    reloadButton.style.border = 'none';
+    reloadButton.style.borderRadius = '5px';
+    reloadButton.style.cursor = 'pointer';
+    reloadButton.style.boxShadow = '0px 0px 5px rgba(255, 77, 77, 0.6)';
     reloadButton.addEventListener('click', reloadGun);
     document.body.appendChild(reloadButton);
 
     updateAmmoDisplay();
 });
+
 
 function genRandomColor() {
     const r = Math.floor(Math.random() * 256);

@@ -60,7 +60,7 @@ killCount.style.position = "absolute";
 killCount.style.top = "50px"; // Positioned below the life bar
 killCount.style.right = "20px";
 killCount.style.width = "110px";
-killCount.style.height = "60px";
+killCount.style.height = "40px";
 killCount.style.color = "yellow"; // Flashy retro color
 killCount.style.fontFamily = "'Press Start 2P', sans-serif"; // Blocky pixel font
 killCount.style.fontSize = "18px";
@@ -82,9 +82,17 @@ function updateKillCount() {
 function updateLevel() {
   currentLevel++;
   zombiesToKill += 5;
-  localStorage.setItem("currentLevel", currentLevel);
-  localStorage.setItem("zombiesToKill", zombiesToKill);
-  window.location.href = `level${currentLevel}.html`;
+    
+  if(currentLevel <= 3){
+    localStorage.setItem("currentLevel", currentLevel);
+    localStorage.setItem("zombiesToKill", zombiesToKill);
+    window.location.href = `level${currentLevel}.html`;
+  }
+  else{
+    localStorage.setItem("currentLevel", 1);
+    localStorage.setItem("zombiesToKill", 5);
+    window.location.href = "gameover.html";
+  }
 }
 
 function handleZombieDeath(zombie) {
@@ -106,7 +114,7 @@ let timerInterval;
 // Create timer display
 const timerDisplay = document.createElement("div");
 timerDisplay.style.position = "absolute";
-timerDisplay.style.top = "80px"; // Positioned below the kill meter
+timerDisplay.style.top = "100px"; // Positioned below the kill meter
 timerDisplay.style.right = "20px";
 timerDisplay.style.width = "110px";
 timerDisplay.style.height = "60px";
@@ -191,16 +199,16 @@ class PowerUp {
     // Define the path to the 3D model file based on power-up type
     switch (this.type) {
       case powerUpTypes.ZOMBIE_SLOWDOWN:
-        modelPath = "./shell.glb"; // Path to zombie slowdown model
+        modelPath = "/assets/models/shell.glb"; // Path to zombie slowdown model
         scalar = 0.0018;
         break;
 
       case powerUpTypes.PLAYER_SPEEDUP:
-        modelPath = "./lightning.glb"; // Path to player speedup model
+        modelPath = "/assets/models/lightning.glb"; // Path to player speedup model
         scalar = 2;
         break;
       case powerUpTypes.HEALTH_BOOST:
-        modelPath = "./medicines.glb"; // Path to health boost model
+        modelPath = "/assets/models/medicines.glb"; // Path to health boost model
         scalar = 0.05;
         break;
       default:
@@ -350,7 +358,7 @@ function startBackgroundSound() {
     console.error("Error playing forest sound:", error);
   });
 }
-startBackgroundSound();
+document.body.addEventListener('click', startBackgroundSound, { once: true });
 
 cannonDebugger = new CannonDebugger(scene, world, { color: 0x00ff00 });
 
@@ -553,8 +561,6 @@ function updateLifeBar() {
         }
         heavyBreathingSound.pause();
         heavyBreathingSound.currentTime = 0;
-        heartbeatSound.pause();
-        heartbeatSound.currentTime = 0;
         redOverlay.style.display = 'block'; // Show the red overlay
         redOverlay.classList.add('pulsate'); // Add the pulsate animation
     }
@@ -563,32 +569,105 @@ function updateLifeBar() {
 //game over screen
 
 function createGameOverScreen() {
-  gameOverScreen = document.createElement("div");
-  gameOverScreen.style.position = "absolute";
-  gameOverScreen.style.top = "50%";
-  gameOverScreen.style.left = "50%";
-  gameOverScreen.style.transform = "translate(-50%, -50%)";
-  gameOverScreen.style.textAlign = "center";
-  gameOverScreen.style.color = "orange";
-  gameOverScreen.style.fontFamily = "'Press Start 2P', cursive";
-  gameOverScreen.style.fontSize = "24px";
-  gameOverScreen.style.display = "none";
-  gameOverScreen.innerHTML = `
-        <h1 style="color: orange;">GAME OVER</h1>
-        <p>PLAY AGAIN?</p>
-        <button id="yes-btn" style="margin: 10px; padding: 5px 10px; font-family: inherit; font-size: 18px;">YES</button>
-        <button id="no-btn" style="margin: 10px; padding: 5px 10px; font-family: inherit; font-size: 18px;">NO</button>
+    gameOverScreen = document.createElement("div");
+    gameOverScreen.style.position = "absolute";
+    gameOverScreen.style.top = "50%";
+    gameOverScreen.style.left = "50%";
+    gameOverScreen.style.transform = "translate(-50%, -50%)";
+    gameOverScreen.style.textAlign = "center";
+    gameOverScreen.style.color = "#ff0000";
+    gameOverScreen.style.fontFamily = "'Creepster', cursive";
+    gameOverScreen.style.fontSize = "32px";
+    gameOverScreen.style.display = "none";
+    gameOverScreen.style.background = "rgba(0, 0, 0, 0.9)";
+    gameOverScreen.style.padding = "40px";
+    gameOverScreen.style.border = "4px solid #8b0000";
+    gameOverScreen.style.boxShadow =
+      "0 0 20px #ff0000, inset 0 0 30px rgba(139, 0, 0, 0.5)";
+    gameOverScreen.style.animation = "pulse 2s infinite";
+  
+    // Add blood drips CSS
+    const style = document.createElement("style");
+    style.textContent = `
+      @keyframes pulse {
+        0% { box-shadow: 0 0 20px #ff0000, inset 0 0 30px rgba(139, 0, 0, 0.5); }
+        50% { box-shadow: 0 0 40px #ff0000, inset 0 0 50px rgba(139, 0, 0, 0.7); }
+        100% { box-shadow: 0 0 20px #ff0000, inset 0 0 30px rgba(139, 0, 0, 0.5); }
+      }
+      
+      .blood-drip {
+        position: absolute;
+        width: 4px;
+        background: #8b0000;
+        animation: drip 2s infinite;
+        border-radius: 0 0 2px 2px;
+      }
     `;
-  document.body.appendChild(gameOverScreen);
-
-  document.getElementById("yes-btn").addEventListener("click", restartGame);
-  document.getElementById("no-btn").addEventListener("click", () => {
-    // Do nothing when 'NO' is clicked, game remains in "Game Over" state
-  });
-}
-
-// Call this function to initialize the game over screen
-createGameOverScreen();
+    document.head.appendChild(style);
+  
+    gameOverScreen.innerHTML = `
+      <h1 style="
+        color: #ff0000;
+        text-shadow: 0 0 10px #ff0000;
+        font-size: 48px;
+        margin-bottom: 30px;
+        letter-spacing: 2px;
+        transform: skew(-5deg);
+      ">GAME OVER</h1>
+      <p style="
+        color: #ff4444;
+        margin-bottom: 30px;
+        text-shadow: 0 0 5px #ff0000;
+      ">YOUR BLOOD HAS BEEN SPILLED</p>
+      <button id="yes-btn" style="
+        margin: 10px;
+        padding: 10px 20px;
+        font-family: 'Creepster', cursive;
+        font-size: 24px;
+        background: #8b0000;
+        color: #fff;
+        border: 2px solid #ff0000;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-shadow: 0 0 5px #ff0000;
+      ">RISE AGAIN</button>
+      <button id="no-btn" style="
+        margin: 10px;
+        padding: 10px 20px;
+        font-family: 'Creepster', cursive;
+        font-size: 24px;
+        background: #000;
+        color: #ff0000;
+        border: 2px solid #8b0000;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-shadow: 0 0 5px #ff0000;
+      ">ACCEPT DEATH</button>
+    `;
+  
+    document.body.appendChild(gameOverScreen);
+  
+    // Add hover effects for buttons
+    const buttons = gameOverScreen.querySelectorAll("button");
+    buttons.forEach((button) => {
+      button.addEventListener("mouseover", () => {
+        button.style.transform = "scale(1.1)";
+        button.style.boxShadow = "0 0 15px #ff0000";
+      });
+      button.addEventListener("mouseout", () => {
+        button.style.transform = "scale(1)";
+        button.style.boxShadow = "none";
+      });
+    });
+  
+    document.getElementById("yes-btn").addEventListener("click", restartGame);
+    document.getElementById("no-btn").addEventListener("click", () => {
+        window.location.href = "index.html";
+    });
+  }
+  
+  // Call this function to initialize the game over screen
+  createGameOverScreen();
 
 function checkGameOver() {
   if (playerLife <= 0 && !isGameOver) {
@@ -596,12 +675,22 @@ function checkGameOver() {
     playerLife = 0;
     updateLifeBar();
     showGameOverScreen();
-    Endmusic.play().catch((error) => {
-      console.error("Error playing end sound:", error);
-    });
-    Endmusic.currentTime = 26;
-    forestSound.pause();
-    forestSound.currentTime = 0;
+
+    // Loop through all zombies and turn off their sound
+  zombies.forEach(zombie => {
+    if (zombie.sound) {
+      zombie.sound.gameover = true;
+      zombie.sound.currentTime = 0;
+    }
+  });
+  Endmusic.play().catch((error) => {
+    console.error("Error playing end sound:", error);
+  });
+  Endmusic.currentTime = 31;
+  heartbeatSound.pause();
+  heartbeatSound.currentTime = 0;
+  forestSound.pause();
+  forestSound.currentTime = 0;
   }
 }
 
@@ -794,7 +883,7 @@ function addMoon() {
   scene.add(sky);
 
   const textureLoader = new THREE.TextureLoader();
-  textureLoader.load("moon.jpg", function (texture) {
+  textureLoader.load("./assets/images/moon.jpg", function (texture) {
     // Create moon sphere (visual representation) with the texture
     const moonGeometry = new THREE.SphereGeometry(40, 32, 32);
     const moonMaterial = new THREE.MeshBasicMaterial({ map: texture }); // Use moon texture
@@ -832,7 +921,7 @@ function addSky() {
 function addClouds() {
   clouds = new THREE.Group();
   const loader = new GLTFLoader();
-  const cloudModelPath = "./cloud.glb";
+  const cloudModelPath = "./assets/models/cloud.glb";
   const cloudCount = 19;
 
   loader.load(
@@ -964,7 +1053,7 @@ function createWall() {
   const textureLoader = new THREE.TextureLoader();
 
   // Load wall bump map
-  const wallBumpMap = textureLoader.load("wallbumpmap.jpg");
+  const wallBumpMap = textureLoader.load("./assets/images/wallbumpmap.jpg");
 
   // Configure the bump map so it doesn't tile too many times
   wallBumpMap.wrapS = wallBumpMap.wrapT = THREE.RepeatWrapping;
@@ -1038,7 +1127,7 @@ function createTerrain() {
 
   // Load the ground texture
   const loader = new THREE.TextureLoader();
-  loader.load("ground.jpg", (groundTexture) => {
+  loader.load("./assets/images/ground.jpg", (groundTexture) => {
     // Repeat the texture over the terrain
     groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
     groundTexture.repeat.set(terrainWidth / 10, terrainLength / 10); // Adjust the repeat to fit the terrain size
@@ -1090,8 +1179,8 @@ function addTrees() {
   const textureLoader = new THREE.TextureLoader();
 
   // Load textures
-  const barkBumpMap = textureLoader.load("treebark.jpg");
-  const leafTexture = textureLoader.load("leaves.avif");
+  const barkBumpMap = textureLoader.load("./assets/images/treebark.jpg");
+  const leafTexture = textureLoader.load("./assets/images/leaves.avif");
 
   // Define grid size
   const gridSize = Math.sqrt((width * length) / treeCount);
@@ -1221,11 +1310,11 @@ function addStructures() {
   const structureCount = width * 0.01;
   const textureLoader = new THREE.TextureLoader();
   // Load texture maps
-  const baseColorMap = textureLoader.load("Wall_Stone_010_basecolor.jpg");
-  const normalMap = textureLoader.load("Wall_Stone_010_normal.jpg");
-  const roughnessMap = textureLoader.load("Wall_Stone_010_roughness.jpg");
-  const heightMap = textureLoader.load("Wall_Stone_010_height.png"); // Also known as displacement map
-  const aoMap = textureLoader.load("Wall_Stone_010_ambientOcclusion.jpg");
+  const baseColorMap = textureLoader.load("./assets/images/Wall_Stone_010_basecolor.jpg");
+  const normalMap = textureLoader.load("./assets/images/Wall_Stone_010_normal.jpg");
+  const roughnessMap = textureLoader.load("./assets/images/Wall_Stone_010_roughness.jpg");
+  const heightMap = textureLoader.load("./assets/images/Wall_Stone_010_height.png"); // Also known as displacement map
+  const aoMap = textureLoader.load("./assets/images/Wall_Stone_010_ambientOcclusion.jpg");
 
   const brickMaterial = new THREE.MeshStandardMaterial({
     side: THREE.DoubleSide,
@@ -1750,7 +1839,7 @@ function animate() {
   checkGameOver();
   //cannonDebugger.update();
 
-  if (!isPaused) {
+  if (!isPaused && !isGameOver) {
     requestAnimationFrame(animate);
     animateSun();
     animateMoon();

@@ -18,7 +18,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: url("assets/zombie-bg.png") no-repeat center center fixed;
+        background: url("/assets/images/zombie-bg.png") no-repeat center center fixed;
         background-size: cover;
         color: #ff0000;
         font-family: "Creepster", cursive;
@@ -149,9 +149,12 @@
       </div>
     </div>
 
+    <audio id="gameover-sound" src="/assets/audio/gameover.mp3"></audio>
+
     <script>
       window.onload = () => {
         document.getElementById("controls-overlay").style.display = "none";
+        document.body.addEventListener('click', playGameOverSound, { once: true });
       };
       // Function to start a new game
       function startGame() {
@@ -173,6 +176,15 @@
         const overlay = document.getElementById("controls-overlay");
         overlay.style.display =
           overlay.style.display === "flex" ? "none" : "flex";
+      }
+            // Function to play the gameover sound
+      function playGameOverSound() {
+        const gameOverSound = document.getElementById("gameover-sound");
+        if (gameOverSound.paused) {
+            gameOverSound.play().catch(error => {
+                console.error("Error playing gameover sound:", error);
+            });
+        }
       }
 
       // Enable resume button if currentLevel is not equal to 1
